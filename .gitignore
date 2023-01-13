@@ -1,4 +1,5 @@
-data
+data/
 roboflow.zip
 .ipynb_checkpoints/
 results/
+.vscode/
