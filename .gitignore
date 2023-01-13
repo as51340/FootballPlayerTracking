@@ -3,3 +3,5 @@ roboflow.zip
 .ipynb_checkpoints/
 results/
 .vscode/
+sequences/
+annotation/
