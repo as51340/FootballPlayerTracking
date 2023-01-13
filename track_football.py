@@ -89,7 +89,10 @@ APPEARENCE_DESCRIPTOR_WEIGHTS_DEFAULT = "osnet_x0_25_msmt17.pt"
 STRONGSORT = "strongsort"
 PROJECT_FOLDER_DEF = "runs/track"
 <<<<<<< HEAD
+<<<<<<< HEAD
 NAME_RUN_DEFAULT = "exp"
+=======
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 
@@ -215,6 +218,10 @@ def run(
     show_vid=False,  # show results
     save_txt=False,  # save results to *.txt
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    save_conf=False,  # save confidences in --save-txt labels
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
     save_conf=False,  # save confidences in --save-txt labels
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
@@ -227,16 +234,22 @@ def run(
     update=False,  # update all models
     project=ROOT / PROJECT_FOLDER_DEF,  # save results to project/name
 <<<<<<< HEAD
+<<<<<<< HEAD
     name=NAME_RUN_DEFAULT,  # save results to project/name
     exist_ok=False,  # existing project/name ok, do not increment
     line_thickness=2,  # bounding box thickness (pixels)
 =======
+=======
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
     name="exp",  # save results to project/name
     exist_ok=False,  # existing project/name ok, do not increment
     line_thickness=2,  # bounding box thickness (pixels)
     hide_labels=False,  # hide labels
     hide_conf=False,  # hide confidences
     hide_class=False,  # hide IDs
+<<<<<<< HEAD
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
+=======
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
     half=False,  # use FP16 half-precision inference
     dnn=False,  # use OpenCV DNN for ONNX inference
@@ -289,9 +302,12 @@ def run(
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
 <<<<<<< HEAD
+<<<<<<< HEAD
     
     # Flag to break from everything
     exit_requested = False
+=======
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 
@@ -421,11 +437,15 @@ def run(
             if show_vid:
                 cv2.imshow(str(p), im0)  # here the image is being shown
 <<<<<<< HEAD
+<<<<<<< HEAD
                 key = cv2.waitKey(1) & 0xFF # 1 millisecond
                 if key == ord("q"):
                     exit_requested = True
                     break
                     
+=======
+                cv2.waitKey(1)  # 1 millisecond
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
                 cv2.waitKey(1)  # 1 millisecond
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
@@ -441,10 +461,13 @@ def run(
             if team_classification:
                 match.reset()
 <<<<<<< HEAD
+<<<<<<< HEAD
         
         # Break from the execution
         if exit_requested:
             return
+=======
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 
@@ -512,6 +535,12 @@ def parse_opt():
     parser.add_argument("--save-txt", action="store_true", help="save results to *.txt")
     parser.add_argument(
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+        "--save-conf", action="store_true", help="save confidences in --save-txt labels"
+    )
+    parser.add_argument(
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
 =======
         "--save-conf", action="store_true", help="save confidences in --save-txt labels"
     )
@@ -549,7 +578,10 @@ def parse_opt():
     )
     parser.add_argument(
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
         "--hide-labels", default=False, action="store_true", help="hide labels"
     )
     parser.add_argument(
@@ -559,6 +591,9 @@ def parse_opt():
         "--hide-class", default=False, action="store_true", help="hide IDs"
     )
     parser.add_argument(
+<<<<<<< HEAD
+>>>>>>> 368fa399e657829eb0b44d02a78521828013367d
+=======
 >>>>>>> 368fa399e657829eb0b44d02a78521828013367d
         "--half", action="store_true", help="use FP16 half-precision inference"
     )
