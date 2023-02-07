@@ -1,3 +1,3 @@
-[submodule "Yolov5PlayerTracking"]
-	path = Yolov5PlayerTracking
+[submodule "football_player_tracking"]
+	path = football_player_tracking
 	url = https://github.com/as51340/football_player_tracking
