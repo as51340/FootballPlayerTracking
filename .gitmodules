@@ -1,3 +1,3 @@
-[submodule "Yolov5_StrongSORT_OSNet"]
-	path = Yolov5_StrongSORT_OSNet
-	url = https://github.com/mikel-brostrom/Yolov5_StrongSORT_OSNet
+[submodule "Yolov5PlayerTracking"]
+	path = Yolov5PlayerTracking
+	url = https://github.com/as51340/football_player_tracking

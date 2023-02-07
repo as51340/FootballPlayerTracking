@@ -1,6 +1,7 @@
 from typing import List, Tuple, Dict
 import os
 from collections import defaultdict
+import time
 
 import numpy as np
 import cv2 as cv
@@ -127,7 +128,7 @@ def draw_old_circles(img, points):
         cv.circle(img, (x,y), 5, RED, -1)
 
 
-def squash_detections(path_to_detections: str, H: np.ndarray, squasher_func, info_extract_func):
+def squash_detections(path_to_detections: str, H: np.ndarray, squasher_func = None, info_extract_func = None):
     """Squashes detections from the bounding box to the one point and transforms them using the homography matrix.
     Args:
         path_to_detections (str): 
@@ -135,15 +136,12 @@ def squash_detections(path_to_detections: str, H: np.ndarray, squasher_func, inf
         squasher_func: Lambda function to transform bounding boxes into one point.
 
     """
+    start_time = time.time()
     with open(path_to_detections, "r") as d_file:
-        squashed_temp_detections = []
+        detections_info = []
         squashed_detections = []
-        cnt = 0
         lines = d_file.readlines()
-        squashed_detections = list(map(squasher_func, lines)) # ...
         for line in lines:
-            if cnt == 10:
-                break
             line = line.split(" ")
             # Extract bounding box information
             frame_id = int(line[0])
@@ -154,30 +152,51 @@ def squash_detections(path_to_detections: str, H: np.ndarray, squasher_func, inf
             bb_height = float(line[5])
             # Calculate lower center
             bb_lower_center = [bb_left + 0.5 * bb_width, bb_top + bb_height, 1]  # for (in)homogeneous coordinates
-            print(f"BB lower center: {bb_lower_center}")
-            squashed_temp_detections.append((frame_id, object_id))
+            # print(f"BB lower center: {bb_lower_center}")
+            detections_info.append((frame_id, object_id))
             squashed_detections.append(bb_lower_center)
-            cnt += 1
         squashed_detections = np.array(squashed_detections)
-        print(f"Before transformation: {squashed_detections}")
-        squashed_detections = squashed_detections@H
-        print(f"After transformation: {squashed_detections}")
-        return squashed_detections
+        # print(f"Before transformation: {squashed_detections}")
+        squashed_detections = squashed_detections@H.T
+        # print(f"After transformation: {squashed_detections}")
+        print(f"Reading: {frame_id+1} frames took: {time.time() - start_time}s")
+        return squashed_detections, detections_info
 
-def draw_detections(detections: Dict[int, List[float]], pitch_img):
-    for frame_id, squashed_detections in detections.items():
-        print(f"Frame id: {frame_id}")
-        cv.imshow(DETECTIONS_WINDOW, pitch_img)
-        # for squashed_detection in squashed_detection:
-         #    cv.circle(pitch_img, (x, y), 5, RED, -1)
+def draw_detections(detections: np.array, detections_info: List[Tuple[int, int]], pitch_img):
+    cv.namedWindow(DETECTIONS_WINDOW)
+    cv.moveWindow(DETECTIONS_WINDOW, 80,80); # where to put the window
+    
+    last_frame_id = None
+    detections_per_frame = [] 
+    for detection, (frame_id, object_id) in zip(detections, detections_info):
+        k = cv.waitKey(1) & 0xFF
+        if last_frame_id is None or frame_id == last_frame_id:
+            # print(f"Original detection: {detection}")
+            detection = list(map(lambda x: int(x / detection[2]), detection))
+            # print(f"Detection: {detection}")
+            detections_per_frame.append(detection)
+        else:
+            frame_img = pitch_img.copy()
+            print(f"Num detection in frame {frame_id} = {len(detections_per_frame)}")
+            for frame_detection in detections_per_frame:
+                cv.circle(frame_img, (frame_detection[0], frame_detection[1]), 5, RED, -1)
+            cv.imshow(DETECTIONS_WINDOW, frame_img)
+            detections_per_frame = []
+        
+        last_frame_id = frame_id
+        if k == ord('q'):
+            break
+        
+    cv.destroyAllWindows()
 
 
 if __name__ == "__main__":
     # Path to images
-    SRC_IMG_PATH = os.path.join(os.getcwd(), "./images/materials/reference_img.jpg")
+    SRC_IMG_PATH = os.path.join(os.getcwd(), "./images/materials/t7_reference_img.jpg")
     DST_IMG_PATH = os.path.join(os.getcwd(), "./images/materials/pitch.jpg")
     print(f"Real image: {SRC_IMG_PATH}")
     print(f"Artificial image: {DST_IMG_PATH}")
+    detection_img = cv.imread(DST_IMG_PATH, -1)
     # Path to detections
     DET_PATH = os.path.join(os.getcwd(), "./results/track/exp17/tracks/t4.txt")
     print(f"Path to detections: {DET_PATH}")
@@ -186,12 +205,13 @@ if __name__ == "__main__":
     src_img, src_img_copy = read_image(SRC_WINDOW, SRC_IMG_PATH, src_points)
     dst_img, dst_img_copy = read_image(DST_WINDOW, DST_IMG_PATH, dst_points)
 
-    # plan_view, H, mask = visualize(src_points, dst_points, src_img, src_img_copy, dst_img, dst_img_copy)
+    plan_view, H, mask = visualize(src_points, dst_points, src_img, src_img_copy, dst_img, dst_img_copy)
 
-    H = np.array([[4.96880829e-03, 1.38109006e+00, -9.50897851e+01],
-                [-3.33220488e-01, 4.19221488e-01, 9.04820655e+02],
-                [1.35525043e-04, 2.46362905e-03, 1.00000000e+00]]
+    # H = np.array([[4.96880829e-03, 1.38109006e+00, -9.50897851e+01],
+    #            [-3.33220488e-01, 4.19221488e-01, 9.04820655e+02],
+    #            [1.35525043e-04, 2.46362905e-03, 1.00000000e+00]])
+    print(f"H type: {H}")
 
-    print(f"H type: {type(H)}")
-
-    bv_lower_centers = squash_detections(DET_PATH, H)
+    squashed_detections, detections_info = squash_detections(DET_PATH, H)
+    
+    draw_detections(squashed_detections, detections_info, detection_img)
