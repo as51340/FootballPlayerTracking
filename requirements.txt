@@ -1,0 +1,2 @@
+# Be sure to download all needed for detections
+screeninfo==0.8.1
