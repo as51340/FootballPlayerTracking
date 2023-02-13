@@ -48,6 +48,19 @@ class Pitch:
                 if pitch_data[0] == pitch_name:
                     return Pitch(pitch_path, *(map(lambda tup_str: literal_eval(tup_str), pitch_data[1:])))
         return None
+    
+    def get_team_by_position(self, frame_detection: Tuple[int, int]):
+        """Returns initial team by the coord of the player. Returns True for the first part of the pitch and False for the second part of the pitch. When the pitch has horizontal layoff, the first part
+        is the left part and when the pitch has the horizontal layoff, the first part is considered the upper part of the pitch.
+
+        Args:
+            frame_detection: Tuple[int, int]
+        """
+        if (self.x_dim == PitchOrientation.LENGTH and frame_detection[0] < self.length / 2) or \
+            (self.x_dim == PitchOrientation.WIDTH and  frame_detection[1] < self.length / 2 ):
+                return True
+        return False
+    
 
 if __name__ == "__main__":
     pitch = Pitch.load_pitch("./pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg")

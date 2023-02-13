@@ -9,44 +9,14 @@ import numpy as np
 import cv2 as cv
 
 from monitor_utils import get_offset_to_second_monitor
-from view import ViewMode
+import view
 from pitch import Pitch, PitchOrientation
-from team_classification import TeamClassificator
+# from team_classification import TeamClassificator, DBSCANTeamClassificator, KMeansTeamClassificator, get_bounding_boxes
+from match import Match
+from team import Team
 import config
+import constants
 
-
-# Constants
-RED = (0, 0, 255)
-# SRC_WINDOW and DST_WINDOW are used for homography calculation
-# DETECTIONS_WINDOW is used for birds-eye view on the pitch
-# VIDEO_WINDOW is used for playing video with detections
-SRC_WINDOW, DST_WINDOW, DETECTIONS_WINDOW = "src", "dst", "det"
-VIDEO_WINDOW = "vid"
-
-# Global variables
-last_clicked_windows = []
-
-
-# mouse callback function
-def _select_points_wrapper(event, x, y, _, params):
-    """Wrapper for mouse callback.
-    """
-    global last_clicked_window
-    window, points, img_copy = params
-    if event == cv.EVENT_LBUTTONDOWN:
-        last_clicked_windows.append(window)
-        cv.circle(img_copy, (x,y), 5, RED, -1)
-        points.append([x, y])
-
-def read_image(img_path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """Reads image from the given path and creates its copy.
-    Args:
-        img_path (str): Path of the image.
-    """
-    # Registers a mouse callback function on a image's copy.
-    img = cv.imread(img_path, -1)
-    img_copy = img.copy()
-    return img, img_copy
 
 def get_plan_view(src_img: np.ndarray, dst_img: np.ndarray, src_points: List[List[int]], dst_points: List[List[int]]):
     """Warps original image.
@@ -65,13 +35,7 @@ def get_plan_view(src_img: np.ndarray, dst_img: np.ndarray, src_points: List[Lis
     plan_view = cv.warpPerspective(src_img, H, (dst_img.shape[1], dst_img.shape[0]))
     return plan_view, H, mask
 
-def full_screen_on_monitor(window_name):
-    cv.namedWindow(window_name, cv.WND_PROP_FULLSCREEN)
-    monitor_info = get_offset_to_second_monitor()
-    cv.setWindowProperty(window_name, cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
-    cv.moveWindow(window_name, monitor_info[0], monitor_info[1]);
-    
-def visualize(src_points: List[List[int]], dst_points: List[List[int]], src_img: np.ndarray, src_img_copy: np.ndarray, dst_img: np.ndarray, dst_img_copy: np.ndarray):
+def calculate_homography(view_: view.View, src_points: List[List[int]], dst_points: List[List[int]], src_img: np.ndarray, src_img_copy: np.ndarray, dst_img: np.ndarray, dst_img_copy: np.ndarray):
     """Runs visualization in while loop.
     Args:
         src_points (List[List[int]]): Source points' storage.
@@ -82,59 +46,51 @@ def visualize(src_points: List[List[int]], dst_points: List[List[int]], src_img:
         dst_img_copy (numpy.ndarray): Copy of the destination image representation.
     """
     # Source window setup
-    full_screen_on_monitor(SRC_WINDOW)
-    cv.setMouseCallback(SRC_WINDOW, _select_points_wrapper, (SRC_WINDOW, src_points, src_img_copy))
+    view.View.full_screen_on_monitor(constants.SRC_WINDOW)
+    cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
     # Destination window setup
-    cv.namedWindow(DST_WINDOW)
-    cv.setMouseCallback(DST_WINDOW, _select_points_wrapper, (DST_WINDOW, dst_points, dst_img_copy))
+    cv.namedWindow(constants.DST_WINDOW)
+    cv.setMouseCallback(constants.DST_WINDOW, view_._select_points_wrapper, (constants.DST_WINDOW, dst_points, dst_img_copy))
+    referee_id = -1
     while(1):
         # Keep showing copy of the image because of the circles drawn
-        cv.imshow(SRC_WINDOW, src_img_copy)
-        cv.imshow(DST_WINDOW, dst_img_copy)
+        cv.imshow(constants.SRC_WINDOW, src_img_copy)
+        cv.imshow(constants.DST_WINDOW, dst_img_copy)
         k = cv.waitKey(1) & 0xFF
         if k == ord('h'):
             print('create plan view')
             plan_view, H, _ = get_plan_view(src_img, dst_img, src_points, dst_points)
-            cv.imshow("plan view", plan_view) 
-        elif k == ord('d') and last_clicked_windows:
-            undo_window = last_clicked_windows.pop()
-            if undo_window == SRC_WINDOW and src_points:
+            print(f"Please insert referee id: ")
+            referee_id = int(input())
+            print(f"Referee has the initial id: {referee_id}")
+            cv.imshow("plan view", plan_view)
+        elif k == ord('d') and view_.last_clicked_windows:
+            undo_window = view_.last_clicked_windows.pop()
+            if undo_window == constants.SRC_WINDOW and src_points:
                 src_points.pop()
                 # Reinitialize image
                 src_img_copy = src_img.copy()
-                cv.setMouseCallback(SRC_WINDOW, _select_points_wrapper, (SRC_WINDOW, src_points, src_img_copy))
-                draw_old_circles(src_img_copy, src_points)
-            elif undo_window == DST_WINDOW and dst_points:
+                cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
+                view_.draw_old_circles(src_img_copy, src_points)
+            elif undo_window == constants.DST_WINDOW and dst_points:
                 dst_points.pop()
                 # Reinitialize image
                 dst_img_copy = dst_img.copy()
-                cv.setMouseCallback(DST_WINDOW, _select_points_wrapper, (DST_WINDOW, dst_points, dst_img_copy))
-                draw_old_circles(dst_img_copy, dst_points)
+                cv.setMouseCallback(constants.DST_WINDOW, view_._select_points_wrapper, (constants.DST_WINDOW, dst_points, dst_img_copy))
+                view_.draw_old_circles(dst_img_copy, dst_points)
         elif k == ord("s"):
             print(f"Source points: {src_points}")
             print(f"Dest points: {dst_points}")
         elif k == ord('q'):
             cv.destroyAllWindows()
-            return H
+            return H, referee_id
 
-def draw_old_circles(img, points):
-    """Draws all saved points on an image. Used for implementing undo buffer.
-    Args:
-        img (np.ndarray): A reference to the image.
-        points (List[List[int]]): Points storage.
-    """
-    for x, y in points:
-        cv.circle(img, (x,y), 5, RED, -1)
-        
 def take_reference_img_for_homography(vid_capture: cv.VideoCapture, reference_img_path: str):
     """Takes 0th frame from the video for using it as a reference image for creating homography.
 
     Args:
         vid_capture (cv.VideoCapture): Reference to the video
         reference_img_path (str): Path where to save the reference image.
-    Returns:
-        ret: whether the frame was succesfully read
-        frame: 0th frame
     """
     ret, frame = vid_capture.read()
     if ret:
@@ -197,124 +153,111 @@ def is_detection_outside(pitch: Pitch, detection_x_coord: int, detection_y_coord
         return True
     return False
 
-def is_assistant_referee_positioned(pitch: Pitch, detection_x_coord: int, detection_y_coord: int) -> bool:
-    """Checks whether the detection is positioned as a assistant referee. This can be side-line referee but also 4th behind the goal.
+def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture):
+    """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
         pitch (Pitch): _description_
-        detection_x_coord (int): _description_
-        detection_y_coord (int): _description_
+        detections_storage (_type_): _description_
+        pitch_img (_type_): _description_
+        reference_frame (_type_): _description_
+        detections_vid_capture (_type_): _description_
 
     Returns:
-        bool: true if it is positioned like the assistant referee could be positioned.
+        _type_: _description_
     """
-    # Must not be with both coordinates outside of the pitch.
-    if detection_x_coord >= pitch.upper_left_corner[0] - config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and detection_x_coord <= pitch.upper_left_corner[0] + config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and \
-        detection_y_coord >= pitch.upper_left_corner[1] and detection_y_coord <= pitch.down_left_corner[1]:
-            return True  # left sideline check
-    if detection_x_coord >= pitch.upper_right_corner[0] - config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and detection_x_coord <= pitch.upper_right_corner[0] + config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and \
-        detection_y_coord >= pitch.upper_right_corner[1] and detection_y_coord <= pitch.down_right_corner[1]:
-            return True  # right sideline check
-    if detection_x_coord >= pitch.upper_left_corner[0] and detection_x_coord <= pitch.upper_right_corner[0] and \
-        detection_y_coord >= pitch.upper_left_corner[1] - config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and detection_y_coord <= pitch.upper_left_corner[1] + config.ASSISTANT_REFEREE_PIXEL_TOLERANCE:
-            return True  # up sideline check
-    if detection_x_coord >= pitch.down_left_corner[0] and detection_x_coord <= pitch.down_right_corner[0] and \
-        detection_y_coord >= pitch.down_left_corner[1] - config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and detection_y_coord <= pitch.down_left_corner[1] + config.ASSISTANT_REFEREE_PIXEL_TOLERANCE:
-            return True  # down sideline check
-    return False
-
-
-def get_bounding_boxes(bb_info, video_frame):
-    bboxes = []
-    for bb in bb_info:
-        bbox = video_frame[bb[1]:bb[1]+bb[3], bb[0]:bb[0]+bb[2], :]
-        print(f"bbox shape: {bbox.shape}")
-        bboxes.append(bbox)
-    bboxes = np.array(bboxes)
-    print(bboxes.shape)
-    return bboxes
-
-def play_visualizations(detections_storage, team_classificator: TeamClassificator, pitch_img, reference_frame, detections_vid_capture):
-    view_mode = ViewMode.FULL
-    consumed_first = False
+    # Initialize view, set the timer
     start_time = time.time()
-    # cv.namedWindow("test")
-    for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items():
+    
+    # Run visualizations
+    for frame_id, (detections_per_frame, _, object_ids) in detections_storage.items():
         k = cv.waitKey(1) & 0xFF
+        
         # Playing birds-eye view
         frame_img = pitch_img.copy()
         detections_in_pitch = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), detections_per_frame)))
         print(f"Num detection in frame {frame_id}: {len(detections_in_pitch)}")
+        for i, frame_detection in enumerate(detections_in_pitch):
+            if object_ids[i] == match.referee_id:
+                person_color = match.referee_color
+            elif object_ids[i] in match.team1.players:
+                person_color = match.team1.color
+            elif object_ids[i] in match.team2.players:
+                person_color = match.team2.color
+            else:
+                # TODO: prompt the user to solve algorithm's confusion
+                print(f"New object identified with id: {object_ids[i]}")
+                exit(-1) 
+            view.draw_person(frame_img, str(object_ids[i]),(int(frame_detection[0]), int(frame_detection[1])), person_color)
+        cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
         
-        for frame_detection in detections_in_pitch:
-            cv.circle(frame_img, (int(frame_detection[0]), int(frame_detection[1])), 5, RED, -1)    
-        cv.imshow(DETECTIONS_WINDOW, frame_img)
-        # Playing video with detections
-        if not consumed_first:
-            cv.imshow(VIDEO_WINDOW, reference_frame)
-            consumed_first = True
-        else:
-            _, video_frame = detections_vid_capture.read()
-            bboxes = get_bounding_boxes(bb_info, video_frame)
-            # cv.imshow("test", bboxes[9])
-            cv.imshow(VIDEO_WINDOW, video_frame)
-            # team_classificator.classify_persons_into_categories(bboxes)
+        # Real video
+        _, video_frame = detections_vid_capture.read()
+        # bboxes, max_height, max_width = get_bounding_boxes(bb_info, video_frame)
+        # team_classificator.classify_persons_into_categories(bboxes, max_height, max_width)
+        cv.imshow(constants.VIDEO_WINDOW, video_frame)
         
-        # This will destroy all current windows being shown 
+        # Handle key-press
         if k == ord('f'):
-            if view_mode == ViewMode.FULL:
-                print("Changing to resized")
-                cv.setWindowProperty(VIDEO_WINDOW, cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
-                view_mode = ViewMode.NORMAL
-            elif view_mode == ViewMode.NORMAL:
-                print("Changing to full")
-                full_screen_on_monitor(VIDEO_WINDOW)
-                view_mode = ViewMode.FULL
+            view_mode = view.handle_screen_view_mode(view_mode)
         elif k == ord('q'):
             return True
+        
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False
-
     
-def play_analysis(pitch: Pitch, team_classificator: TeamClassificator, path_to_video: str, path_to_ref_img: str, path_to_detections: str):
+def play_analysis(view_: view.View, pitch: Pitch, path_to_video: str, path_to_ref_img: str, path_to_detections: str):
     """ Two videos are being shown. One real which shows football match and the other one on which detections are being shown.
         Detections are drawn on a pitch image. Detections are mapped by a frame id. This is the current setup in which we first collect whole video and all detections by a tracker and then use this program
         to analyze data. In the future this can maybe be optimized so everything is being run online.
     Args:
     """
-    print(f"Img path: {pitch.img_path}")
     pitch_img = cv.imread(pitch.img_path, -1)
+    
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
     _, reference_frame = take_reference_img_for_homography(detections_vid_capture, path_to_ref_img)
-    # Probably should be moved to the view
+    
+    # Create homography
     src_points, dst_points = [], []
-    dst_img, dst_img_copy = read_image(args.pitch_path)
+    dst_img, dst_img_copy = view.View.read_image(args.pitch_path)
     try:
         H = np.array([[ 4.22432222e-01, 1.17147500e+00, -4.66582423e+02],
                 [-1.71746715e-02, 2.59856556e+00, -1.85840310e+02],
                 [-4.68413825e-05, 4.99413200e-03, 1.00000000e+00]])
-        # H = visualize(src_points, dst_points, reference_frame, reference_frame.copy(), dst_img, dst_img_copy)
+        referee_id = 23
+        H, referee_id = calculate_homography(view_, src_points, dst_points, reference_frame, reference_frame.copy(), dst_img, dst_img_copy)
+        print(f"H: {H:}")
     except:
         print(f"Couldn't create homography matrix, exiting from the program...")
         exit(-1)
-    
-    print(f"H: {H:}")
     detections_storage = squash_detections(path_to_detections, H)
+    
+    # Initialize match
+    sorted_keys = sorted(detections_storage.keys())
+    frame_detections0, _, object_ids0 = detections_storage[sorted_keys[0]]
+    detections_storage.pop(sorted_keys[0]) # Don't visualize the first frame
+    detections_in_pitch0 = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), frame_detections0)))
+    match = Match.initialize_match(pitch, detections_in_pitch0, object_ids0, referee_id)
+    
     # Setup window for showing match
     print(f"FPS: {detections_vid_capture.get(5)}")
     print(f"Frame count: {detections_vid_capture.get(7)}")
-    full_screen_on_monitor(VIDEO_WINDOW)
+    view.full_screen_on_monitor(constants.VIDEO_WINDOW)
+    
     # Window for detections
-    cv.namedWindow(DETECTIONS_WINDOW)
+    cv.namedWindow(constants.DETECTIONS_WINDOW)
     monitor_info = get_offset_to_second_monitor()
     x_coord_det, y_coord_det = int(monitor_info[0] + 0.5 * monitor_info[2]), int(monitor_info[1] + 0.75 * monitor_info[3]) 
-    cv.moveWindow(DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
-    while not play_visualizations(detections_storage, team_classificator, pitch_img, reference_frame, detections_vid_capture):
+    cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
+    
+    # Run visualizations
+    while not play_visualizations(pitch, match, detections_storage, pitch_img, detections_vid_capture):
         # Restart the video if you didn't get any input
         print("Video loop ON")
         detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
         
+    # Postprocess
     print("Finished playing the video")
     detections_vid_capture.release()
     cv.destroyAllWindows()
@@ -330,10 +273,10 @@ if __name__ == "__main__":
     parser.add_argument("--pitch-path", type=str, required=True, help="Path to the pitch image for visualizing in bird's eye mode.")
     args = parser.parse_args()
     
-    pitch = Pitch.load_pitch(args.pitch_path)  
-    team_classificator = TeamClassificator("kmeans")
+    pitch = Pitch.load_pitch(args.pitch_path)
+    view_ = view.View()
     
     ref_img = args.workdir + "/ref_img.jpg"
     print(f"Ref img: {ref_img}")
     
-    play_analysis(pitch, team_classificator, args.video_path, ref_img, args.detections_path)
+    play_analysis(view_, pitch, args.video_path, ref_img, args.detections_path)
