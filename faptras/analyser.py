@@ -14,6 +14,7 @@ from pitch import Pitch, PitchOrientation
 # from team_classification import TeamClassificator, DBSCANTeamClassificator, KMeansTeamClassificator, get_bounding_boxes
 from match import Match
 from team import Team
+from person import Referee, Player, Person
 import config
 import constants
 
@@ -153,6 +154,34 @@ def is_detection_outside(pitch: Pitch, detection_x_coord: int, detection_y_coord
         return True
     return False
 
+def get_new_objects(match: Match, bb_infos: Tuple[int, int, int, int], object_ids: List[int]) -> List[int]:
+    # TODO: write it in the functional manner
+    new_objects: List[Tuple[int, int, int, int], int] = []
+    for i, obj_id in enumerate(object_ids):
+        if match.find_player_with_id(obj_id) is None:
+            new_objects.append((bb_infos[i], obj_id))
+    return new_objects
+
+def create_new_player(match: Match) -> None:
+    """Creates new player when the user cannot recognize it from the existing ones. The method asks user to provide details about the name and jersey number.
+
+    Args:
+        player_id (int): player id
+    """
+    print("Enter new player's team name: ")
+    team = input()
+    print("Enter new player's name: ")
+    name = input()
+    print("Enter player's jersey number: ")
+    jersey_num = int(input())
+    match.max_id += 1
+    if team == match.team1.name:
+        match.team1.players.append( Player(name, jersey_num, match.max_id) )
+    elif team == match.team2.name:
+        match.team2.players.append( Player(name, jersey_num, match.max_id) )
+
+        
+
 def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture):
     """Plays visualization of both, real video and video created with the usage of homography.
 
@@ -170,29 +199,57 @@ def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_im
     start_time = time.time()
     
     # Run visualizations
-    for frame_id, (detections_per_frame, _, object_ids) in detections_storage.items():
-        k = cv.waitKey(1) & 0xFF
-        
+    for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
         # Playing birds-eye view
         frame_img = pitch_img.copy()
         detections_in_pitch = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), detections_per_frame)))
-        print(f"Num detection in frame {frame_id}: {len(detections_in_pitch)}")
-        for i, frame_detection in enumerate(detections_in_pitch):
-            if object_ids[i] == match.referee_id:
-                person_color = match.referee_color
-            elif object_ids[i] in match.team1.players:
-                person_color = match.team1.color
-            elif object_ids[i] in match.team2.players:
-                person_color = match.team2.color
-            else:
-                # TODO: prompt the user to solve algorithm's confusion
-                print(f"New object identified with id: {object_ids[i]}")
-                exit(-1) 
-            view.draw_person(frame_img, str(object_ids[i]),(int(frame_detection[0]), int(frame_detection[1])), person_color)
-        cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
-        
         # Real video
         _, video_frame = detections_vid_capture.read()
+        # Check whether we will have to deal with new object in this frame
+        new_object_ids = get_new_objects(match, bb_info, object_ids)
+        for bb_info_new_id, new_obj_id in new_object_ids:
+            print(f"New object id: {new_obj_id}")
+            new_frame = video_frame.copy()
+            # For now let's just extract the first element
+            print(constants.prompt_input)
+            view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
+            while True:
+                k = cv.waitKey(1) & 0xFF
+                cv.imshow(constants.VIDEO_WINDOW, new_frame)
+                if k == ord('q'):
+                    print(f"Exit from the new object detections")
+                    break
+            user_enter = input()
+            if not user_enter:
+                create_new_player(match)
+            elif int(user_enter) == 0:
+                match.referee.ids.append(new_obj_id)
+            elif int(user_enter) != -1:
+                ex_player = match.find_player_with_id(int(user_enter))
+                print(f"Found ex player with ids: {ex_player.ids}")
+                if not ex_player:  # if there is no player with this enter, repeat the procedure as when the user entered empty string
+                    create_new_player(match)
+                else:
+                    ex_player.ids.append(new_obj_id)
+        
+        # Wait for the new key
+        k = cv.waitKey(1) & 0xFF
+        
+        # Process per detection
+        for i, frame_detection in enumerate(detections_in_pitch):
+            if object_ids[i] in match.referee.ids:
+                person_color = match.referee.color
+            elif match.team1.get_player(object_ids[i]) is not None:
+                person_color = match.team1.color
+            elif match.team2.get_player(object_ids[i]) is not None:
+                person_color = match.team2.color
+            else:
+                print(f"Error new object")
+            view.View.draw_person(frame_img, str(object_ids[i]),(int(frame_detection[0]), int(frame_detection[1])), person_color)
+            view.View.box_label(video_frame, bb_info[i], person_color, object_ids[i])
+            
+        # Display
+        cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
         # bboxes, max_height, max_width = get_bounding_boxes(bb_info, video_frame)
         # team_classificator.classify_persons_into_categories(bboxes, max_height, max_width)
         cv.imshow(constants.VIDEO_WINDOW, video_frame)
@@ -226,24 +283,24 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_video: str, path_to_re
                 [-1.71746715e-02, 2.59856556e+00, -1.85840310e+02],
                 [-4.68413825e-05, 4.99413200e-03, 1.00000000e+00]])
         referee_id = 23
-        H, referee_id = calculate_homography(view_, src_points, dst_points, reference_frame, reference_frame.copy(), dst_img, dst_img_copy)
+        # H, referee_id = calculate_homography(view_, src_points, dst_points, reference_frame, reference_frame.copy(), dst_img, dst_img_copy)
         print(f"H: {H:}")
     except:
         print(f"Couldn't create homography matrix, exiting from the program...")
         exit(-1)
     detections_storage = squash_detections(path_to_detections, H)
     
-    # Initialize match
-    sorted_keys = sorted(detections_storage.keys())
-    frame_detections0, _, object_ids0 = detections_storage[sorted_keys[0]]
+    # Initialize match part 1
+    sorted_keys = sorted(detections_storage.keys())  # sort by frame_id
+    frame_detections0, _, object_ids0 = detections_storage[sorted_keys[0]]  # detections and object_ids in the 0th frame
     detections_storage.pop(sorted_keys[0]) # Don't visualize the first frame
-    detections_in_pitch0 = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), frame_detections0)))
+    detections_in_pitch0 = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), frame_detections0)))  # get only detections in the pitch
+    # Initialize match part 2
     match = Match.initialize_match(pitch, detections_in_pitch0, object_ids0, referee_id)
     
     # Setup window for showing match
     print(f"FPS: {detections_vid_capture.get(5)}")
-    print(f"Frame count: {detections_vid_capture.get(7)}")
-    view.full_screen_on_monitor(constants.VIDEO_WINDOW)
+    print(f"Frame count: {detections_vid_capture.get(8)}")
     
     # Window for detections
     cv.namedWindow(constants.DETECTIONS_WINDOW)
@@ -274,7 +331,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     pitch = Pitch.load_pitch(args.pitch_path)
-    view_ = view.View()
+    view_ = view.View(view.ViewMode.NORMAL)
+    # view_.full_screen_on_monitor(constants.VIDEO_WINDOW)
+
     
     ref_img = args.workdir + "/ref_img.jpg"
     print(f"Ref img: {ref_img}")
