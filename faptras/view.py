@@ -9,6 +9,8 @@ import constants
 from monitor_utils import get_offset_to_second_monitor
 
 ViewMode = Enum('ViewMode', ['FULL', 'NORMAL'])  # full screen vs normal mode
+DrawMode = Enum('DrawMode', ['CIRCLE', 'TEXT'])
+
 
 TEXT_FACE = cv.FONT_HERSHEY_DUPLEX
 TEXT_SCALE = 0.5
@@ -19,6 +21,44 @@ class View:
     def __init__(self, view_mode: ViewMode) -> None:
         self.last_clicked_windows = []
         self.view_mode = view_mode
+        self.draw_mode = DrawMode.CIRCLE
+        
+    def switch_screen_mode(self):
+        """Switches screen mode
+        """
+        if self.view_mode == ViewMode.FULL:
+            cv.setWindowProperty(constants.VIDEO_WINDOW, cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
+            self.view_mode = ViewMode.NORMAL
+        else:
+            View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+            self.view_mode = ViewMode.FULL
+    
+    def switch_draw_mode(self):
+        if self.draw_mode == DrawMode.CIRCLE:
+            self.draw_mode = DrawMode.TEXT
+        else:
+            self.draw_mode = DrawMode.CIRCLE
+
+    # mouse callback function
+    def _select_points_wrapper(self, event, x, y, _, params):
+        """Wrapper for mouse callback.
+        """
+        global last_clicked_window
+        window, points, img_copy = params
+        if event == cv.EVENT_LBUTTONDOWN:
+            self.last_clicked_windows.append(window)
+            cv.circle(img_copy, (x,y), constants.RADIUS, constants.RED, -1)
+            points.append([x, y])
+ 
+    def draw_person(self, frame_img: np.ndarray, text: str, center: Tuple[int, int], color: Tuple[int, int, int]):
+        """Draws person as a circle and a text inside.
+        """
+        if self.draw_mode == DrawMode.CIRCLE:
+            cv.circle(frame_img, center, 5, color, -1)    
+        else:
+            text_size, _ = cv.getTextSize(text, TEXT_FACE, TEXT_SCALE, TEXT_THICKNESS)
+            text_origin = (int(center[0] - text_size[0] / 2), int(center[1] + text_size[1] / 2))
+            cv.putText(frame_img, text, text_origin, TEXT_FACE, TEXT_SCALE, color, TEXT_THICKNESS, cv.LINE_AA)
     
     @classmethod
     def full_screen_on_monitor(cls, window_name):
@@ -26,17 +66,7 @@ class View:
         monitor_info = get_offset_to_second_monitor()
         cv.setWindowProperty(window_name, cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
         cv.moveWindow(window_name, monitor_info[0], monitor_info[1]);    
-
-    @classmethod
-    def draw_person(cls, frame_img: np.ndarray, text: str, center: Tuple[int, int], text_color: Tuple[int, int, int]):
-        """Draws person as a circle and a text inside.
-        """
-        # cv.circle(frame_img, center, radius, circle_color, -1)    
-        text_size, _ = cv.getTextSize(text, TEXT_FACE, TEXT_SCALE, TEXT_THICKNESS)
-        text_origin = (int(center[0] - text_size[0] / 2), int(center[1] + text_size[1] / 2))
-        cv.putText(frame_img, text, text_origin, TEXT_FACE, TEXT_SCALE, text_color, TEXT_THICKNESS, cv.LINE_AA)
         
-    
     @classmethod
     def box_label(cls, frame: np.ndarray, bb_info: Tuple[int, int, int, int], rec_color,  label='', txt_color=constants.WHITE):
         """Draws label on a video frame. 
@@ -69,47 +99,3 @@ class View:
                     txt_color,
                     thickness=tf,
                     lineType=cv.LINE_AA)
-
-    @classmethod
-    def draw_old_circles(cls, img, points):
-        """Draws all saved points on an image. Used for implementing undo buffer.
-        Args:
-            img (np.ndarray): A reference to the image.
-            points (List[List[int]]): Points storage.
-        """
-        for x, y in points:
-            cv.circle(img, (x,y), 5, constants.RED, -1)
-    
-    @classmethod
-    def read_image(cls, img_path: str) -> Tuple[np.ndarray, np.ndarray]:
-        """Reads image from the given path and creates its copy.
-        Args:
-            img_path (str): Path of the image.
-        """
-        # Registers a mouse callback function on a image's copy.
-        img = cv.imread(img_path, -1)
-        img_copy = img.copy()
-        return img, img_copy
-
-    def switch_screen_mode(self):
-        """Switches screen mode
-        """
-        if self.view_mode == ViewMode.FULL:
-            print("Changing to resized")
-            cv.setWindowProperty(constants.VIDEO_WINDOW, cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
-            self.view_mode = ViewMode.NORMAL
-        else:
-            print("Changing to full")
-            View.full_screen_on_monitor(constants.VIDEO_WINDOW)
-            self.view_mode = ViewMode.FULL
-
-    # mouse callback function
-    def _select_points_wrapper(self, event, x, y, _, params):
-        """Wrapper for mouse callback.
-        """
-        global last_clicked_window
-        window, points, img_copy = params
-        if event == cv.EVENT_LBUTTONDOWN:
-            self.last_clicked_windows.append(window)
-            cv.circle(img_copy, (x,y), 5, constants.RED, -1)
-            points.append([x, y])

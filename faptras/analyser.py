@@ -17,7 +17,11 @@ from team import Team
 from person import Referee, Player, Person
 import config
 import constants
+import utils
 
+def check_kill(k):
+    if k == ord('k'):
+        exit(-1)
 
 def get_plan_view(src_img: np.ndarray, dst_img: np.ndarray, src_points: List[List[int]], dst_points: List[List[int]]):
     """Warps original image.
@@ -36,7 +40,7 @@ def get_plan_view(src_img: np.ndarray, dst_img: np.ndarray, src_points: List[Lis
     plan_view = cv.warpPerspective(src_img, H, (dst_img.shape[1], dst_img.shape[0]))
     return plan_view, H, mask
 
-def calculate_homography(view_: view.View, src_points: List[List[int]], dst_points: List[List[int]], src_img: np.ndarray, src_img_copy: np.ndarray, dst_img: np.ndarray, dst_img_copy: np.ndarray):
+def calculate_homography(view_: view.View, src_points: List[List[int]], dst_points: List[List[int]], src_img: np.ndarray, dst_img: np.ndarray):
     """Runs visualization in while loop.
     Args:
         src_points (List[List[int]]): Source points' storage.
@@ -47,6 +51,8 @@ def calculate_homography(view_: view.View, src_points: List[List[int]], dst_poin
         dst_img_copy (numpy.ndarray): Copy of the destination image representation.
     """
     # Source window setup
+    src_img_copy: np.ndarray = src_img.copy()
+    dst_img_copy: np.ndarray = dst_img.copy()
     view.View.full_screen_on_monitor(constants.SRC_WINDOW)
     cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
     # Destination window setup
@@ -61,9 +67,6 @@ def calculate_homography(view_: view.View, src_points: List[List[int]], dst_poin
         if k == ord('h'):
             print('create plan view')
             plan_view, H, _ = get_plan_view(src_img, dst_img, src_points, dst_points)
-            print(f"Please insert referee id: ")
-            referee_id = int(input())
-            print(f"Referee has the initial id: {referee_id}")
             cv.imshow("plan view", plan_view)
         elif k == ord('d') and view_.last_clicked_windows:
             undo_window = view_.last_clicked_windows.pop()
@@ -72,19 +75,19 @@ def calculate_homography(view_: view.View, src_points: List[List[int]], dst_poin
                 # Reinitialize image
                 src_img_copy = src_img.copy()
                 cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
-                view_.draw_old_circles(src_img_copy, src_points)
+                view.View.draw_2d_objects(src_img_copy, src_points)
             elif undo_window == constants.DST_WINDOW and dst_points:
                 dst_points.pop()
                 # Reinitialize image
                 dst_img_copy = dst_img.copy()
                 cv.setMouseCallback(constants.DST_WINDOW, view_._select_points_wrapper, (constants.DST_WINDOW, dst_points, dst_img_copy))
-                view_.draw_old_circles(dst_img_copy, dst_points)
+                view.View.draw_2d_objects(dst_img_copy, dst_points)
         elif k == ord("s"):
             print(f"Source points: {src_points}")
             print(f"Dest points: {dst_points}")
         elif k == ord('q'):
             cv.destroyAllWindows()
-            return H, referee_id
+            return H
 
 def take_reference_img_for_homography(vid_capture: cv.VideoCapture, reference_img_path: str):
     """Takes 0th frame from the video for using it as a reference image for creating homography.
@@ -158,7 +161,7 @@ def get_new_objects(match: Match, bb_infos: Tuple[int, int, int, int], object_id
     # TODO: write it in the functional manner
     new_objects: List[Tuple[int, int, int, int], int] = []
     for i, obj_id in enumerate(object_ids):
-        if match.find_player_with_id(obj_id) is None:
+        if obj_id not in match.ignore_ids and match.find_person_with_id(obj_id) is None:
             new_objects.append((bb_infos[i], obj_id))
     return new_objects
 
@@ -168,21 +171,70 @@ def create_new_player(match: Match) -> None:
     Args:
         player_id (int): player id
     """
-    print("Enter new player's team name: ")
-    team = input()
     print("Enter new player's name: ")
     name = input()
     print("Enter player's jersey number: ")
     jersey_num = int(input())
     match.max_id += 1
-    if team == match.team1.name:
-        match.team1.players.append( Player(name, jersey_num, match.max_id) )
-    elif team == match.team2.name:
-        match.team2.players.append( Player(name, jersey_num, match.max_id) )
+    while True:
+        print("Enter new player's team name: ")
+        team = input()
+        if team == match.team1.name:
+            match.team1.players.append( Player(name, jersey_num, match.max_id) )
+            break
+        elif team == match.team2.name:
+            match.team2.players.append( Player(name, jersey_num, match.max_id) )
+            break
+        else:
+            print(f"Such team doesn't exist, in this match there are two teams: {match.team1.name} {match.team2.name}")
 
+def user_team_resolution(match: Match, uncertain_objs: List[Tuple[int, Tuple[int, int]]], img: np.ndarray, window: str) -> None:
+    for uncertain_obj_id, bb_obj_info in uncertain_objs:
+        show_frame = img.copy() 
+        view.View.box_label(show_frame, bb_obj_info, constants.BLACK, uncertain_obj_id)
+        while True:
+            print(f"Please insert the team of the player shown on the screen: ")
+            # new thread
+            while True:
+                k = cv.waitKey(1) & 0xFF
+                cv.imshow(window, show_frame)
+                if k == ord('q'):
+                    break
+                check_kill(k)
+            team = input()
+            print(f"Team: {team}")
+            if team.lower() == match.team1.name.lower():
+                match.team1.players.append(Player("name", -1, uncertain_obj_id))
+                break
+            elif team.lower() == match.team2.name.lower():
+                match.team2.players.append(Player("name", -1, uncertain_obj_id))
+                break
+            else:
+                print("Unknown team, please insert again...")                
         
 
-def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture):
+def get_objects_within_pitch(pitch: Pitch, detections, bb_info, object_ids) -> Tuple[Tuple[int, int], Tuple[int, int, int, int], List[int]]:
+    """Returns detections (2D objects), bounding boxes and object_ids only of objects which are within the pitch boundary.
+
+    Args:
+        pitch (Pitch): A reference to the pitch.
+        detections (_type_): 2D detections.
+        bb_info (_type_): Bounding box information.
+        object_ids (_type_): Objects ids
+
+    Returns:
+        _type_: _description_
+    """
+    detections_in_pitch, bb_info_ids, object_ids_in_pitch = [], [], []
+    for i, detection in enumerate(detections):
+        if not is_detection_outside(pitch, detection[0], detection[1]):
+            detections_in_pitch.append(detection)
+            bb_info_ids.append(bb_info[i])
+            object_ids_in_pitch.append(object_ids[i])
+    return detections_in_pitch, bb_info_ids, object_ids_in_pitch
+    
+
+def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -202,11 +254,12 @@ def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_im
     for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
         # Playing birds-eye view
         frame_img = pitch_img.copy()
-        detections_in_pitch = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), detections_per_frame)))
+        # Inefficient as fuck because we are creating copy of the list
+        detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = get_objects_within_pitch(pitch, detections_per_frame, bb_info, object_ids)
         # Real video
         _, video_frame = detections_vid_capture.read()
         # Check whether we will have to deal with new object in this frame
-        new_object_ids = get_new_objects(match, bb_info, object_ids)
+        new_object_ids = get_new_objects(match, bb_info_in_pitch, object_ids_in_pitch)
         for bb_info_new_id, new_obj_id in new_object_ids:
             print(f"New object id: {new_obj_id}")
             new_frame = video_frame.copy()
@@ -216,37 +269,42 @@ def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_im
             while True:
                 k = cv.waitKey(1) & 0xFF
                 cv.imshow(constants.VIDEO_WINDOW, new_frame)
+                check_kill(k)
                 if k == ord('q'):
-                    print(f"Exit from the new object detections")
                     break
             user_enter = input()
             if not user_enter:
                 create_new_player(match)
             elif int(user_enter) == 0:
                 match.referee.ids.append(new_obj_id)
-            elif int(user_enter) != -1:
+            elif int(user_enter) == -1:
+                match.ignore_ids.append(new_obj_id)  # from now on ignore this id
+            else:
                 ex_player = match.find_player_with_id(int(user_enter))
-                print(f"Found ex player with ids: {ex_player.ids}")
-                if not ex_player:  # if there is no player with this enter, repeat the procedure as when the user entered empty string
-                    create_new_player(match)
-                else:
+                if ex_player is not None:
+                    print(f"Found ex player with ids: {ex_player.ids}")
                     ex_player.ids.append(new_obj_id)
+                else:
+                    create_new_player(match)
         
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
         
         # Process per detection
         for i, frame_detection in enumerate(detections_in_pitch):
-            if object_ids[i] in match.referee.ids:
+            if object_ids_in_pitch[i] in match.referee.ids:
                 person_color = match.referee.color
-            elif match.team1.get_player(object_ids[i]) is not None:
+            elif match.team1.get_player(object_ids_in_pitch[i]) is not None:
                 person_color = match.team1.color
-            elif match.team2.get_player(object_ids[i]) is not None:
+            elif match.team2.get_player(object_ids_in_pitch[i]) is not None:
                 person_color = match.team2.color
-            else:
+            elif object_ids_in_pitch[i] not in match.ignore_ids:  # validation flag
                 print(f"Error new object")
-            view.View.draw_person(frame_img, str(object_ids[i]),(int(frame_detection[0]), int(frame_detection[1])), person_color)
-            view.View.box_label(video_frame, bb_info[i], person_color, object_ids[i])
+                exit(-1)
+            
+            if object_ids_in_pitch[i] not in match.ignore_ids:
+                view_.draw_person(frame_img, str(object_ids_in_pitch[i]),(int(frame_detection[0]), int(frame_detection[1])), person_color)
+                view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, object_ids_in_pitch[i])  # BUG, TODO, wrong indexing
             
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
@@ -256,14 +314,16 @@ def play_visualizations(pitch: Pitch, match: Match, detections_storage, pitch_im
         
         # Handle key-press
         if k == ord('f'):
-            view_mode = view.handle_screen_view_mode(view_mode)
+            view_.switch_screen_mode()
+        elif k == ord('s'):
+            view_.switch_draw_mode()  # TODO:
         elif k == ord('q'):
             return True
         
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False
     
-def play_analysis(view_: view.View, pitch: Pitch, path_to_video: str, path_to_ref_img: str, path_to_detections: str):
+def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str, team1_name: str, team2_name: str, cache_homography: bool):
     """ Two videos are being shown. One real which shows football match and the other one on which detections are being shown.
         Detections are drawn on a pitch image. Detections are mapped by a frame id. This is the current setup in which we first collect whole video and all detections by a tracker and then use this program
         to analyze data. In the future this can maybe be optimized so everything is being run online.
@@ -273,34 +333,47 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_video: str, path_to_re
     
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
-    _, reference_frame = take_reference_img_for_homography(detections_vid_capture, path_to_ref_img)
-    
-    # Create homography
-    src_points, dst_points = [], []
-    dst_img, dst_img_copy = view.View.read_image(args.pitch_path)
-    try:
-        H = np.array([[ 4.22432222e-01, 1.17147500e+00, -4.66582423e+02],
-                [-1.71746715e-02, 2.59856556e+00, -1.85840310e+02],
-                [-4.68413825e-05, 4.99413200e-03, 1.00000000e+00]])
-        referee_id = 23
-        # H, referee_id = calculate_homography(view_, src_points, dst_points, reference_frame, reference_frame.copy(), dst_img, dst_img_copy)
-        print(f"H: {H:}")
-    except:
-        print(f"Couldn't create homography matrix, exiting from the program...")
-        exit(-1)
+    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + utils.get_file_name(path_to_video) + ".npy"
+    if cache_homography:
+        _, reference_frame = detections_vid_capture.read()
+        H = np.load(homo_file)
+        print(f"Using cached homography matrix...")
+    else:
+        _, reference_frame = take_reference_img_for_homography(detections_vid_capture, path_to_ref_img)
+        # Create homography
+        src_points, dst_points = [], []
+        dst_img = cv.imread(path_to_pitch, -1)
+        try:
+            H = calculate_homography(view_, src_points, dst_points, reference_frame, dst_img)
+            np.save(homo_file, H)
+        except:
+            print(f"Couldn't create homography matrix, exiting from the program...")
+            exit(-1)
+    print(f"H: {H:}")
     detections_storage = squash_detections(path_to_detections, H)
     
     # Initialize match part 1
     sorted_keys = sorted(detections_storage.keys())  # sort by frame_id
-    frame_detections0, _, object_ids0 = detections_storage[sorted_keys[0]]  # detections and object_ids in the 0th frame
+    frame_detections0, bb_info0, object_ids0 = detections_storage[sorted_keys[0]]  # detections and object_ids in the 0th frame
     detections_storage.pop(sorted_keys[0]) # Don't visualize the first frame
-    detections_in_pitch0 = np.array(list(filter(lambda frame_detection: not is_detection_outside(pitch, frame_detection[0], frame_detection[1]), frame_detections0)))  # get only detections in the pitch
+    frame_detections0, bb_info0, object_ids0 = get_objects_within_pitch(pitch, frame_detections0, bb_info0, object_ids0)
     # Initialize match part 2
-    match = Match.initialize_match(pitch, detections_in_pitch0, object_ids0, referee_id)
-    
-    # Setup window for showing match
-    print(f"FPS: {detections_vid_capture.get(5)}")
-    print(f"Frame count: {detections_vid_capture.get(8)}")
+    # First let the user decide about the referee id
+    ref_reference_frame = reference_frame.copy()
+    for i, bb_obj_info0 in enumerate(bb_info0):
+        view.View.box_label(ref_reference_frame, bb_obj_info0, constants.BLACK, object_ids0[i])
+    print("Please enter referee id: ")
+    while True:
+        k = cv.waitKey(1) & 0xFF
+        cv.imshow(constants.VIDEO_WINDOW, ref_reference_frame)
+        check_kill(k)
+        if k == ord('q'):
+            break
+    referee_id = int(input())
+    print(f"Referee id: {referee_id}")
+    # Create real match
+    match, uncertain_objs = Match.initialize_match(pitch, frame_detections0, bb_info0, object_ids0, referee_id, team1_name, team2_name)
+    user_team_resolution(match, uncertain_objs, reference_frame, constants.VIDEO_WINDOW)
     
     # Window for detections
     cv.namedWindow(constants.DETECTIONS_WINDOW)
@@ -309,9 +382,8 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_video: str, path_to_re
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
     
     # Run visualizations
-    while not play_visualizations(pitch, match, detections_storage, pitch_img, detections_vid_capture):
+    while not play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture):
         # Restart the video if you didn't get any input
-        print("Video loop ON")
         detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
         
     # Postprocess
@@ -328,14 +400,18 @@ if __name__ == "__main__":
     parser.add_argument("--detections-video-path", type=str, required=False, help="Path to the video with detections.")
     parser.add_argument("--detections-path", type=str, required=True, help="Path to the txt file with detections in MOT format.")
     parser.add_argument("--pitch-path", type=str, required=True, help="Path to the pitch image for visualizing in bird's eye mode.")
+    parser.add_argument("--team1-name", type=str, required=True, help="First team's name")
+    parser.add_argument("--team2-name", type=str, required=True, help="Second team's name")
+    parser.add_argument("--cache-homography", required=False, default=False, action="store_true", help="If set to True, the program will try to reuse the existing homography matrix. If flag set to True\
+                        but there is no cached homography matrix for this video, the application will prompt you to enter it. ")
     args = parser.parse_args()
     
     pitch = Pitch.load_pitch(args.pitch_path)
+    # Setup view
     view_ = view.View(view.ViewMode.NORMAL)
     # view_.full_screen_on_monitor(constants.VIDEO_WINDOW)
 
-    
     ref_img = args.workdir + "/ref_img.jpg"
-    print(f"Ref img: {ref_img}")
+    print(f"Cached homography: {args.cache_homography}")
     
-    play_analysis(view_, pitch, args.video_path, ref_img, args.detections_path)
+    play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path, args.team1_name, args.team2_name, args.cache_homography)

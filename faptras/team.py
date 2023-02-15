@@ -4,7 +4,8 @@ from person import Player
 
 class Team:
     
-    def __init__(self, color: Tuple[int, int, int]) -> bool:
+    def __init__(self, team_name: str, color: Tuple[int, int, int]) -> bool:
+        self.name = team_name
         self.players: List[Player] = []
         self.color = color
         

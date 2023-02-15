@@ -4,6 +4,7 @@ from enum import Enum
 from ast import literal_eval
 
 import config
+import utils
 
 PitchOrientation = Enum('PitchOrientation', ['LENGTH', 'WIDTH'])
 
@@ -38,9 +39,8 @@ class Pitch:
     @classmethod
     def load_pitch(cls, pitch_path: str) -> Pitch:
         # Get the name of the file only without extension
-        last_slash_ind, last_dot_ind = pitch_path.rfind('/'), pitch_path.rfind('.')
-        pitch_name = pitch_path[last_slash_ind+1:last_dot_ind]
-        with open(config.path_to_pitches_config, "r") as pitches_config_file:
+        pitch_name = utils.get_file_name(pitch_path)
+        with open(config.PATH_TO_PITCHES, "r") as pitches_config_file:
             while (line := pitches_config_file.readline().rstrip()):
                 if line.startswith('#'):
                     continue
@@ -49,18 +49,28 @@ class Pitch:
                     return Pitch(pitch_path, *(map(lambda tup_str: literal_eval(tup_str), pitch_data[1:])))
         return None
     
-    def get_team_by_position(self, frame_detection: Tuple[int, int]):
-        """Returns initial team by the coord of the player. Returns True for the first part of the pitch and False for the second part of the pitch. When the pitch has horizontal layoff, the first part
-        is the left part and when the pitch has the horizontal layoff, the first part is considered the upper part of the pitch.
+    def get_team_by_position(self, frame_detection: Tuple[int, int]) -> int:
+        """Returns initial team by the coord of the player. Returns 1 for the first part of the pitch and 2 for the second part of the pitch. When the pitch has horizontal layoff, the first part
+        is the left part and when the pitch has the horizontal layoff, the first part is considered the upper part of the pitch. Returns 2 for uncertain players near the centre.
 
         Args:
             frame_detection: Tuple[int, int]
         """
-        if (self.x_dim == PitchOrientation.LENGTH and frame_detection[0] < self.length / 2) or \
-            (self.x_dim == PitchOrientation.WIDTH and  frame_detection[1] < self.length / 2 ):
-                return True
-        return False
-    
+        if self.x_dim == PitchOrientation.LENGTH:
+            if frame_detection[0] < self.upper_left_corner[0] + self.length / 2 - 10:
+                return 1  # certain that is the first team
+            elif frame_detection[0] > self.upper_left_corner[0] + self.length / 2 + 10:
+                return 2
+            else:
+                return 0  # second team
+        else:  # width orientation
+            if frame_detection[1] < self.upper_left_corner[1] + self.width / 2 - 10:
+                return 1  # certain that is the first team
+            elif frame_detection[1] > self.upper_left_corner[1] + self.width / 2 + 10:
+                return 2
+            else:
+                return 0  # second team            
+            
 
 if __name__ == "__main__":
     pitch = Pitch.load_pitch("./pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg")
