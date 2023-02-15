@@ -40,7 +40,25 @@ def get_plan_view(src_img: np.ndarray, dst_img: np.ndarray, src_points: List[Lis
     plan_view = cv.warpPerspective(src_img, H, (dst_img.shape[1], dst_img.shape[0]))
     return plan_view, H, mask
 
-def calculate_homography(view_: view.View, src_points: List[List[int]], dst_points: List[List[int]], src_img: np.ndarray, dst_img: np.ndarray):
+def do_homography(detections_vid_capture, path_to_ref_img: str, path_to_pitch: str, homo_file: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Wrapper function that does all necessary preparation for calling calculate_homography function.
+
+    Args:
+        detections_vid_capture (_type_): reference to the video
+        path_to_ref_img (str): 
+        path_to_pitch (str): 
+        homo_file (str): path where the homography file is saved.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: reference frame = 0th frame from th video and homography matrix.
+    """
+    _, reference_frame = take_reference_img_for_homography(detections_vid_capture, path_to_ref_img)
+    # Create homography
+    H = calculate_homography(view_, reference_frame, path_to_pitch)
+    np.save(homo_file, H)
+    return reference_frame, H
+
+def calculate_homography(view_: view.View, src_img: np.ndarray, path_to_pitch: str):
     """Runs visualization in while loop.
     Args:
         src_points (List[List[int]]): Source points' storage.
@@ -51,7 +69,9 @@ def calculate_homography(view_: view.View, src_points: List[List[int]], dst_poin
         dst_img_copy (numpy.ndarray): Copy of the destination image representation.
     """
     # Source window setup
+    src_points, dst_points = [], []
     src_img_copy: np.ndarray = src_img.copy()
+    dst_img = cv.imread(path_to_pitch, -1)
     dst_img_copy: np.ndarray = dst_img.copy()
     view.View.full_screen_on_monitor(constants.SRC_WINDOW)
     cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
@@ -336,19 +356,14 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + utils.get_file_name(path_to_video) + ".npy"
     if cache_homography:
         _, reference_frame = detections_vid_capture.read()
-        H = np.load(homo_file)
-        print(f"Using cached homography matrix...")
-    else:
-        _, reference_frame = take_reference_img_for_homography(detections_vid_capture, path_to_ref_img)
-        # Create homography
-        src_points, dst_points = [], []
-        dst_img = cv.imread(path_to_pitch, -1)
         try:
-            H = calculate_homography(view_, src_points, dst_points, reference_frame, dst_img)
-            np.save(homo_file, H)
+            H = np.load(homo_file)
+            print(f"Using cached homography matrix...")
         except:
-            print(f"Couldn't create homography matrix, exiting from the program...")
-            exit(-1)
+            print(f"Loading homography matrix failed, you will have to id manually...")
+            reference_frame, H = do_homography(detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
+    else:
+        reference_frame, H = do_homography(detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
     print(f"H: {H:}")
     detections_storage = squash_detections(path_to_detections, H)
     
