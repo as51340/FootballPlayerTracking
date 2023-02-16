@@ -57,7 +57,7 @@ class Match:
         Returns:
             Tuple[Match, List[int]]: Instance of the match and all objects that couldn't be initially classified.
         """
-        match = Match(Referee("Pierluigi Collina", referee_id, constants.YELLOW), team1_name, team2_name)
+        match = Match(Referee("Pierluigi Collina", referee_id, constants.YELLOW) , team1_name, team2_name)
         uncertain_objs = []  # objects near the center
         for i, frame_detection in enumerate(frame_detections):
             if object_ids[i] == referee_id:

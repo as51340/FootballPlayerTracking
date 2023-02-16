@@ -1,0 +1,6 @@
+2###barcelona
+12###barcelona
+13###real madrid
+18###barcelona
+19###barcelona
+21###barcelona

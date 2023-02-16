@@ -208,7 +208,38 @@ def create_new_player(match: Match) -> None:
         else:
             print(f"Such team doesn't exist, in this match there are two teams: {match.team1.name} {match.team2.name}")
 
-def user_team_resolution(match: Match, uncertain_objs: List[Tuple[int, Tuple[int, int]]], img: np.ndarray, window: str) -> None:
+def resolve_team_helper(match: Match, team: str, player_id: int):
+    """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
+
+    Args:
+        match (Match): A reference to the match.
+        team (str): Team name
+        player_id (int): Player id which needs to be added to some team.
+
+    Returns:
+        bool: True if team matches one of the teams' names, False otherwise.
+    """
+    if team.lower() == match.team1.name.lower():
+        match.team1.players.append(Player("name", -1, player_id))
+        return True
+    elif team.lower() == match.team2.name.lower():
+        match.team2.players.append(Player("name", -1, player_id))
+        return True
+    return False
+
+
+def user_team_resolution(match: Match, uncertain_objs: List[Tuple[int, Tuple[int, int, int, int]]], img: np.ndarray, window: str, cache_file: str) -> None:
+    """User manually decides about the team of the player shown on the image. If user inputs the team that is not part of the current match, the procedure is repeated for the same player.
+
+    Args:
+        match (Match): A reference to the match.
+        uncertain_objs (List[Tuple[int, Tuple[int, int]]]): All objects that need to be resolved. First item in tuple is the object id that will be shown on the image. Second item are 
+            bounding box coordinates. 
+        img (np.ndarray): A reference to the image on which players will be drawn.
+        window (str): Window name.
+        
+    """
+    player_cache = dict()
     for uncertain_obj_id, bb_obj_info in uncertain_objs:
         show_frame = img.copy() 
         view.View.box_label(show_frame, bb_obj_info, constants.BLACK, uncertain_obj_id)
@@ -223,15 +254,43 @@ def user_team_resolution(match: Match, uncertain_objs: List[Tuple[int, Tuple[int
                 check_kill(k)
             team = input()
             print(f"Team: {team}")
-            if team.lower() == match.team1.name.lower():
-                match.team1.players.append(Player("name", -1, uncertain_obj_id))
-                break
-            elif team.lower() == match.team2.name.lower():
-                match.team2.players.append(Player("name", -1, uncertain_obj_id))
-                break
+            if not resolve_team_helper(match, team, uncertain_obj_id):
+                print("Unknown team, please insert again...")
             else:
-                print("Unknown team, please insert again...")                
-        
+                player_cache[uncertain_obj_id] = team.lower()
+                break
+    with open(cache_file, "w") as file:
+        for obj_id, team in player_cache.items():
+            file.write(f"{obj_id}###{team}\n")
+    
+                
+def cache_team_resolution(match: Match, uncertain_objs: List[Tuple[int, Tuple[int, int, int, int]]], cache_file: str) -> bool:
+    """Resolves players' teams based on the cached file. This is used at the beginning, where the user needs to correctly classify players around the center.
+
+    Args:
+        match (Match): A reference to the match.
+        uncertain_objs (List[int, Tuple[int, int, int, int]]): List of unresolved players' ids/
+        cache_file (str): Path to the file where all information is being saved.
+
+    Returns:
+        bool: True if the process went ok and team could be found for every unresolved player, otherwise returns False. If the file doesn't exist, the process returns False.
+    """
+    players_data = dict()
+    try:
+        with open(cache_file, "r") as cache_file:
+            while (line := cache_file.readline().rstrip()):
+                line_data = line.split('###')
+                players_data[int(line_data[0])] = line_data[1]
+    except:
+        return False
+    
+    success = True
+    for uncertain_obj_id, _ in uncertain_objs:
+        cached_team = players_data[uncertain_obj_id]
+        if not resolve_team_helper(match, cached_team, uncertain_obj_id):
+            success = False
+            break    
+    return success        
 
 def get_objects_within_pitch(pitch: Pitch, detections, bb_info, object_ids) -> Tuple[Tuple[int, int], Tuple[int, int, int, int], List[int]]:
     """Returns detections (2D objects), bounding boxes and object_ids only of objects which are within the pitch boundary.
@@ -253,7 +312,6 @@ def get_objects_within_pitch(pitch: Pitch, detections, bb_info, object_ids) -> T
             object_ids_in_pitch.append(object_ids[i])
     return detections_in_pitch, bb_info_ids, object_ids_in_pitch
     
-
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture):
     """Plays visualization of both, real video and video created with the usage of homography.
 
@@ -336,14 +394,15 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         if k == ord('f'):
             view_.switch_screen_mode()
         elif k == ord('s'):
-            view_.switch_draw_mode()  # TODO:
+            view_.switch_draw_mode()
         elif k == ord('q'):
             return True
         
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False
     
-def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str, team1_name: str, team2_name: str, cache_homography: bool):
+def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str, team1_name: str, team2_name: str, 
+                  cache_homography: bool, cache_initial_positions: bool):
     """ Two videos are being shown. One real which shows football match and the other one on which detections are being shown.
         Detections are drawn on a pitch image. Detections are mapped by a frame id. This is the current setup in which we first collect whole video and all detections by a tracker and then use this program
         to analyze data. In the future this can maybe be optimized so everything is being run online.
@@ -353,7 +412,9 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
-    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + utils.get_file_name(path_to_video) + ".npy"
+    extracted_file_name = utils.get_file_name(path_to_video)
+    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"
+    player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + extracted_file_name + ".txt"
     if cache_homography:
         _, reference_frame = detections_vid_capture.read()
         try:
@@ -377,6 +438,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     ref_reference_frame = reference_frame.copy()
     for i, bb_obj_info0 in enumerate(bb_info0):
         view.View.box_label(ref_reference_frame, bb_obj_info0, constants.BLACK, object_ids0[i])
+    # Create real match
     print("Please enter referee id: ")
     while True:
         k = cv.waitKey(1) & 0xFF
@@ -388,7 +450,11 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     print(f"Referee id: {referee_id}")
     # Create real match
     match, uncertain_objs = Match.initialize_match(pitch, frame_detections0, bb_info0, object_ids0, referee_id, team1_name, team2_name)
-    user_team_resolution(match, uncertain_objs, reference_frame, constants.VIDEO_WINDOW)
+    if cache_initial_positions:
+        if not cache_team_resolution(match, uncertain_objs, player_cache_file):
+            user_team_resolution(match, uncertain_objs, reference_frame, constants.VIDEO_WINDOW, player_cache_file)
+    else:
+        user_team_resolution(match, uncertain_objs, reference_frame, constants.VIDEO_WINDOW, player_cache_file)
     
     # Window for detections
     cv.namedWindow(constants.DETECTIONS_WINDOW)
@@ -419,6 +485,8 @@ if __name__ == "__main__":
     parser.add_argument("--team2-name", type=str, required=True, help="Second team's name")
     parser.add_argument("--cache-homography", required=False, default=False, action="store_true", help="If set to True, the program will try to reuse the existing homography matrix. If flag set to True\
                         but there is no cached homography matrix for this video, the application will prompt you to enter it. ")
+    parser.add_argument("--cache-initial-positions", required=False, default=False, action="store_true", help="If set to True, the program will try to reuse the existing information about players initial positions \
+                        so that if there are players around the center, the user doesn't need to input to which team does the player belong")
     args = parser.parse_args()
     
     pitch = Pitch.load_pitch(args.pitch_path)
@@ -429,4 +497,4 @@ if __name__ == "__main__":
     ref_img = args.workdir + "/ref_img.jpg"
     print(f"Cached homography: {args.cache_homography}")
     
-    play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path, args.team1_name, args.team2_name, args.cache_homography)
+    play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path, args.team1_name, args.team2_name, args.cache_homography, args.cache_initial_positions)
