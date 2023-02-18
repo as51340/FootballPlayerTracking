@@ -1,19 +1,19 @@
 from typing import Tuple, List
 
+import numpy as np
+
 from team import Team
 from pitch import Pitch
 from person import Player, Referee, Person
 import constants
-
+import view
+import resolve_helpers
 class Match:
     """Represents the current state of the match.
     """
-    def __init__(self, referee: Referee, team1_name: str, team2_name: str) -> None:
-        # TODO: change this so that is receives whole referee
-        self.referee = referee
+    def __init__(self, team1_name: str, team2_name: str) -> None:
         self.team1 = Team(team1_name, constants.BLUE)
         self.team2 = Team(team2_name, constants.RED)
-        self.max_id = -1
         self.ignore_ids = []  # IDS that are ignored. They get added into this data structure from the user's side, e.g. assistant referee or any other object that user doesn't want to track anymore.
        
     def find_person_with_id(self, id: int) -> Person:
@@ -42,6 +42,147 @@ class Match:
         if p1 is not None:
             return p1
         return self.team2.get_player(id)
+    
+    def resolve_team_helper(self, id: int, team: int, jersey_number: int, name: str):
+        """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
+
+        Args:
+            team (str): Team name`
+            id (int): Player id which needs to be added to some team.
+            jersey_number (int): Jersey number of the player. If it is referee, then it will be ignored.
+
+        Returns:
+            bool: True if team matches one of the teams' names, False otherwise.
+        """
+        if team == 0:
+            self.team1.players.append(Player(name, jersey_number, id))
+            return True
+        elif team == 1:
+            self.team2.players.append(Player(name, jersey_number, id))
+            return True
+        elif team == 2:
+            self.referee = Referee(name, id, constants.YELLOW)
+            return True
+        return False
+
+    def get_new_objects(self, bb_infos: Tuple[int, int, int, int], object_ids: List[int]) -> List[int]:
+        """Returns new objects for the current frame based on the information on ignoring ids and teams.
+
+        Args:
+            bb_infos (Tuple[int, int, int, int]): Bounding boxes. 
+            object_ids (List[int]): List of object identifiers.
+
+        Returns:
+            List[Tuple[int, int, int, int], int]: New objects' bounding boxes and identifiers.
+        """
+        new_objects: List[Tuple[int, int, int, int], int] = []
+        for i, obj_id in enumerate(object_ids):
+            if obj_id not in self.ignore_ids and self.find_person_with_id(obj_id) is None:
+                new_objects.append((bb_infos[i], obj_id))
+        return new_objects
+    
+    def resolve_user_action(self, action: int, obj_id: int, resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
+        """Resolves user input based on a few simple conditions.
+
+        Args:
+            action (int): Action that user requested.
+            obj_id (int): Id of the object that needs resolving
+            resolve_helper (resolve_helpers.LastNFramesHelper): Instance of the helper.
+        """
+        if action == 0:
+            self.referee.ids.append(obj_id)
+        elif action == -1:
+            print(f"Ignoring id: {obj_id}")
+            self.ignore_ids.append(obj_id)  # from now on ignore this id
+        elif action == -2:
+            prompter.set_execution_config(constants.prompt_input)
+            resolve_helper.visualize(constants.DETECTIONS_WINDOW)
+            new_action = int(prompter.value)
+            self.resolve_user_action(new_action, obj_id, resolve_helper, prompter)
+        else:
+            ex_player = self.find_player_with_id(action)
+            if ex_player is not None:
+                print(f"Found ex player with ids: {ex_player.ids}")
+                ex_player.ids.append(obj_id)
+            else:
+                print(f"Ignoring id: {obj_id}")
+
+    
+    
+    @classmethod
+    def cache_team_resolution(cls, cache_file: str):
+        """Resolved initial informations about players and the referee from the cached file.
+        Args:
+            match (Match): A reference to the match.
+            cache_file (str): Path to the file where all information is being saved.
+
+        Returns:
+            None if the process went wrong, match otherwise.
+        """
+        players_data = dict()
+        try:    
+            with open(cache_file, "r") as cache_file:
+                team1_name = cache_file.readline().strip().rstrip()
+                team2_name = cache_file.readline().strip().rstrip()
+                while (line := cache_file.readline().rstrip()):
+                    line_data = line.split('###')
+                    players_data[int(line_data[0])] = line_data[1]
+        except Exception:
+            return False
+
+        match = Match(team1_name, team2_name)
+        for obj_id, line in players_data.items():
+            values = list(map(lambda val: val.strip().rstrip(), line.split(',')))
+            team = int(values[0])
+            jersey_number = int(values[1])
+            if not match.resolve_team_helper(obj_id, team, jersey_number, values[2]):
+                return None
+        return match
+    
+    @classmethod
+    def user_team_resolution(cls, obj_ids: List[int], bb_info: List[Tuple[int, int, int, int]], img: np.ndarray, window: str, cache_file: str, prompter) -> None:
+        """User manually decides about the team of the player shown on the image. If user inputs the team that is not part of the current match, the procedure is repeated for the same player.
+
+        Args:
+            uncertain_objs (List[Tuple[int, Tuple[int, int]]]): All objects that need to be resolved. First item in tuple is the object id that will be shown on the image. Second item are 
+                bounding box coordinates. 
+            img (np.ndarray): A reference to the image on which players will be drawn.
+            window (str): Window name.
+
+        """
+        print("Please insert the name of the first team: ")
+        team_name1 = input()
+        print("Please insert the name of the second team: ")
+        team_name2 = input()
+        match = Match(team_name1, team_name2)
+        player_cache = dict()
+        for i, bb_obj_info in enumerate(bb_info):
+            show_frame = img.copy() 
+            view.View.box_label(show_frame, bb_obj_info, constants.BLACK, obj_ids[i])
+            while True:
+                prompter.set_execution_config("Insert 0 for the first team, 1 for the second and 2 for the referee, jersey_number or -1, name: ")
+                view.View.show_img_while_not_killed(window, show_frame)
+                value = prompter.value
+                values = prompter.value.split(',')
+                values = list(map(lambda val: val.strip().rstrip(), values))
+                print(values)
+                team = int(values[0])
+                jersey_number = int(values[1])
+                try:
+                    if not match.resolve_team_helper(obj_ids[i], team, jersey_number, values[2]):
+                        print("Unknown team, please insert again...")
+                    else:
+                        player_cache[obj_ids[i]] = value
+                        break
+                except ValueError:
+                    print("Wrong format, try again")
+
+        with open(cache_file, "w") as file:
+            file.write(f"{team_name1}\n")
+            file.write(f"{team_name2}\n")
+            for obj_id, line in player_cache.items():
+                file.write(f"{obj_id}###{line}\n")
+        return match
 
     @classmethod
     def initialize_match(cls, pitch: Pitch, frame_detections: Tuple[int, int], bb_info: Tuple[int, int, int, int], object_ids: List[int], referee_id: int, team1_name: str, team2_name: str) -> Tuple["Match", List[Tuple[int, Tuple[int, int]]]]:

@@ -1,6 +1,25 @@
-2###barcelona
-12###barcelona
-13###real madrid
-18###barcelona
-19###barcelona
-21###barcelona
+dinamo
+gorica
+1###1, 16, fruk
+2###0, 12, bockaj
+3###0, 37, sutalo
+4###1, 95, vinko petkovic
+5###0, 28, theophile
+6###0, 5, ademi
+7###1, 88, prsir
+8###1, 19, vujnovic
+9###1, 8, suk
+10###0, 7, ivanusec
+11###1, 1, ziger
+12###0, 77, spikic
+13###1, 89, matavz
+14###1, 11, mitrovic
+15###0, 40, livakovic
+16###0, 13, ristovski
+17###1, 18, tomecak
+18###0, 99, orsic
+19###0, 9, petkovic
+20###1, 7, juric
+21###0, 10, baturina
+22###1, 29, bralic
+23###2, -1, collina

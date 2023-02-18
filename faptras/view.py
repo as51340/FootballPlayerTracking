@@ -6,7 +6,9 @@ import cv2 as cv
 import numpy as np
 
 import constants
+import globals
 from monitor_utils import get_offset_to_second_monitor
+import utils
 
 ViewMode = Enum('ViewMode', ['FULL', 'NORMAL'])  # full screen vs normal mode
 DrawMode = Enum('DrawMode', ['CIRCLE', 'TEXT'])
@@ -21,7 +23,7 @@ class View:
     def __init__(self, view_mode: ViewMode) -> None:
         self.last_clicked_windows = []
         self.view_mode = view_mode
-        self.draw_mode = DrawMode.CIRCLE
+        self.draw_mode = DrawMode.TEXT
         
     def switch_screen_mode(self):
         """Switches screen mode
@@ -59,6 +61,20 @@ class View:
             text_size, _ = cv.getTextSize(text, TEXT_FACE, TEXT_SCALE, TEXT_THICKNESS)
             text_origin = (int(center[0] - text_size[0] / 2), int(center[1] + text_size[1] / 2))
             cv.putText(frame_img, text, text_origin, TEXT_FACE, TEXT_SCALE, color, TEXT_THICKNESS, cv.LINE_AA)
+
+    @classmethod
+    def show_img_while_not_killed(cls, window: str, frame: np.ndarray):
+        """Shows image while not killed from the other thread.
+
+        Args:
+            window (str): on which window frame needs to be shown.
+            frame (np.ndarray): A reference to the frame.
+        """
+        globals.stop_thread = False
+        while not globals.stop_thread:
+            k = cv.waitKey(1) & 0xFF
+            cv.imshow(window, frame)
+            utils.check_kill(k)
     
     @classmethod
     def full_screen_on_monitor(cls, window_name):
