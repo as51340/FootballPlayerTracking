@@ -1,6 +1,6 @@
 # class used for handling view, we will use it for refactoring 
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, Dict
 
 import cv2 as cv
 import numpy as np
@@ -9,6 +9,7 @@ import constants
 import globals
 from monitor_utils import get_offset_to_second_monitor
 import utils
+# Must not import match due to the circular import
 
 ViewMode = Enum('ViewMode', ['FULL', 'NORMAL'])  # full screen vs normal mode
 DrawMode = Enum('DrawMode', ['CIRCLE', 'TEXT'])

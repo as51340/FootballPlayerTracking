@@ -1,5 +1,8 @@
 # Important: If you rename images, you have to rename things in this file too. Width and height in pixels.
-# Format: `image name upper_left_corner down_left_corner down_right_corner upper_right_corner `
+# Format: `image name upper_left_corner down_left_corner down_right_corner upper_right_corner`
+# Maksimir dimensions: 105*68
+# Kranjceviceva: 105*68
+# Velika gorica: 105*68
 green_pitch_rotated_1 (30,30) (30,310) (450,310) (450,30)
 green_pitch_1 (30,30) (30,450) (310,450) (310,30)
 

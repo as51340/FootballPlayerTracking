@@ -1,0 +1,25 @@
+dinamo
+gorica
+1, 14, mitrovic
+0, 13, ristovski
+0, 14, ljubicic
+1, 25, krizmanic
+0, 37, sutalo
+0, 5, ademi
+1, 15, mrzljak
+1, 32, bralic
+1, 7, juric
+0, 27, misic
+1, 21, radosevic
+0, 77, spikic
+1, 89, matavz
+1, 88, prsir
+0, 40, livakovic
+0, 55, peric
+1, 44, tomecak
+0, 7, ivanusec
+0, 9, petkovic
+1, 23, kapulica
+0, 10, baturina
+1, 4, steenvoorde
+2, -1, bel

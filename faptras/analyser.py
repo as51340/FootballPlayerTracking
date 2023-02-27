@@ -1,13 +1,15 @@
 from typing import List, Tuple, Dict
 import time
 import argparse
-import pickle
+import os
+import json
 
 import numpy as np
 import cv2 as cv
 
 from monitor_utils import get_offset_to_second_monitor
 import view
+import analytics_viewer
 from pitch import Pitch
 from match import Match
 import config
@@ -41,7 +43,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         resolving_positions_cache = dict()
         cache_resolving = False
     
-    resolve_helper = resolve_helpers.LastNFramesHelper(500)   
+    resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)   
         
     # Run visualizations
     for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
@@ -50,13 +52,13 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # print([arr[0] / arr[2], arr[1] / arr[2]], detections_per_frame[0])
         # Playing birds-eye view
         frame_img = pitch_img.copy()
-        # Inefficient as fuck because we are creating copy of the list
+        # Inefficient because we are creating copy of the list
         detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = pitch.get_objects_within(detections_per_frame, bb_info, object_ids)
         # Real video
         _, video_frame = detections_vid_capture.read()
         # Check whether we will have to deal with new object in this frame
-        new_object_ids = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch)
-        for bb_info_new_id, new_obj_id in new_object_ids:
+        new_objects = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
+        for detection_info_new_id, bb_info_new_id, new_obj_id in new_objects:
             if cache_resolving:
                 action = int(resolving_positions_cache[new_obj_id])
             else:
@@ -66,8 +68,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
                 view.View.show_img_while_not_killed(constants.VIDEO_WINDOW, new_frame)
                 action = int(prompter.value)
-                resolving_positions_cache[new_obj_id] = action
-                match.resolve_user_action(action, new_obj_id, resolve_helper, prompter)    
+            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, resolve_helper, prompter)    
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
         
@@ -76,19 +77,27 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             id_to_show = str(object_ids_in_pitch[i])
             team1_player = match.team1.get_player(object_ids_in_pitch[i])
             team2_player = match.team2.get_player(object_ids_in_pitch[i])
+            person = None
             if object_ids_in_pitch[i] in match.referee.ids:
+                person = match.referee
                 person_color = match.referee.color
             elif team1_player is not None:
+                person = team1_player
                 person_color, id_to_show = match.team1.color, str(team1_player.label)
             elif team2_player is not None:
+                person = team2_player
                 person_color, id_to_show = match.team2.color, str(team2_player.label)
             elif object_ids_in_pitch[i] not in match.ignore_ids:  # validation flag
-                print(f"Error new object")
-                exit(-1)
+                print(f"New object: {object_ids_in_pitch[i]}")
+                os._exit(-1)
             
             if object_ids_in_pitch[i] not in match.ignore_ids:
-                view_.draw_person(frame_img, id_to_show,(int(frame_detection[0]), int(frame_detection[1])), person_color)
+                frame_detection_int = (int(frame_detection[0]), int(frame_detection[1]))
+                view_.draw_person(frame_img, id_to_show, frame_detection_int, person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
+                # If we are drawing the object, it means we can do analytics
+                person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
+                
             
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
@@ -98,12 +107,19 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Handle key-press
         utils.check_kill(k)
         if k == ord('f'):
+            # Switch between normal and full mode
             view_.switch_screen_mode()
         elif k == ord('s'):
+            # Switch drawing mode between circles and ids
             view_.switch_draw_mode()
         elif k == ord('p'):
+            # Pause visualization
             utils.pause()
+        elif k == ord('r'):
+            # Show analytics
+            analytics_viewer.AnalyticsViewer().show_player_run_table(match)
         elif k == ord('q'):
+            # Quit visualization
             return True, resolving_positions_cache
         
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
@@ -123,7 +139,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     extracted_file_name = utils.get_file_name(path_to_video)
     homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"
     player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + extracted_file_name + ".txt"
-    resolving_positions_cache_file  = config.PATH_TO_RESOLVING_POSITIONS + extracted_file_name + ".pickle"
+    resolving_positions_cache_file  = config.PATH_TO_RESOLVING_POSITIONS + extracted_file_name + ".json"
     if cache_homography:
         _, reference_frame = detections_vid_capture.read()
         try:
@@ -139,11 +155,11 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     
     if cache_resolving:
         try:
-            with open(resolving_positions_cache_file, "rb") as resolving_positions_cache:
-                resolving_positions_cache = pickle.load(resolving_positions_cache)
-                print("Using cached resolving")
+            with open(resolving_positions_cache_file, "r") as resolving_positions_cache_f:
+                resolving_positions_cache = json.load(resolving_positions_cache_f)
+                resolving_positions_cache = dict(map(lambda x: (int(x[0]), int(x[1])), resolving_positions_cache.items()))
         except Exception as e:
-            print("Fallback to manual resolving")
+            print(f"Fallback to manual resolving {e}")
             resolving_positions_cache = None
             cache_resolving = False
     else:
@@ -153,17 +169,16 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     sorted_keys = sorted(detections_storage.keys())  # sort by frame_id
     frame_detections0, bb_info0, object_ids0 = detections_storage[sorted_keys[0]]  # detections and object_ids in the 0th frame
     detections_storage.pop(sorted_keys[0]) # Don't visualize the first frame
-    print(detections_storage[4])
     frame_detections0, bb_info0, object_ids0 = pitch.get_objects_within(frame_detections0, bb_info0, object_ids0)
-    if cache_initial_positions:
+    if cache_initial_positions: 
         match = Match.cache_team_resolution(player_cache_file)
         if not match:
-            match = Match.user_team_resolution(object_ids0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
+            match = Match.user_team_resolution(object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
             print("User needs to resolve initial setting")
         else:
             print("Using cached initial setting")
     else:
-        match = Match.user_team_resolution(object_ids0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
+        match = Match.user_team_resolution(object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
         print("User needs to resolve initial setting")
 
     # Window for detections
@@ -177,8 +192,8 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
         status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, H, resolving_positions_cache)
         # Restart the video if you didn't get any input
         if not cache_resolving and len(resolving_positions_cache) != 0:
-           with open(resolving_positions_cache_file, "wb") as resolving_positions_file:
-               pickle.dump(resolving_positions_cache, resolving_positions_file, protocol=pickle.HIGHEST_PROTOCOL)
+           with open(resolving_positions_cache_file, "w") as resolving_positions_file:
+                json.dump(resolving_positions_cache, resolving_positions_file, indent=2) 
         detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
         if status:
             break
@@ -197,6 +212,8 @@ if __name__ == "__main__":
     parser.add_argument("--detections-video-path", type=str, required=False, help="Path to the video with detections.")
     parser.add_argument("--detections-path", type=str, required=True, help="Path to the txt file with detections in MOT format.")
     parser.add_argument("--pitch-path", type=str, required=True, help="Path to the pitch image for visualizing in bird's eye mode.")
+    parser.add_argument("--pitch-length", type=int, required=False, default=105, help="Pitch length in meters")
+    parser.add_argument("--pitch-width", type=int, required=False, default=68, help="Pitch width in meters")
     parser.add_argument("--cache-homography", required=False, default=False, action="store_true", help="If set to True, the program will try to reuse the existing homography matrix. If flag set to True\
                         but there is no cached homography matrix for this video, the application will prompt you to enter it. ")
     parser.add_argument("--cache-initial-positions", required=False, default=False, action="store_true", help="If set to True, the program will try to reuse the existing information about players initial positions \
@@ -204,16 +221,17 @@ if __name__ == "__main__":
     parser.add_argument("--cache-resolving", required=False, default=False, action="store_true", help="Whether to cache user resolving ids throughout the match")
     args = parser.parse_args()
     
-    pitch = Pitch.load_pitch(args.pitch_path)
+    print(args.pitch_length, args.pitch_width)
+    pitch = Pitch.load_pitch(args.pitch_path, args.pitch_length, args.pitch_width)
     # Setup view
     view_ = view.View(view.ViewMode.NORMAL)
     # view_.full_screen_on_monitor(constants.VIDEO_WINDOW)
-
     ref_img = args.workdir + "/ref_img.jpg"
     if not args.cache_homography:
         args.cache_initial_positions = False
         args.cache_resolving = False
         
     play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path, args.cache_homography, args.cache_initial_positions, args.cache_resolving)
+    # Stop the prompting thread
     prompter.running = False
     prompter.join()

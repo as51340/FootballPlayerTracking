@@ -1,4 +1,5 @@
 # All paths, configs etc. that user shouldn't think about! If the user has to think about them, then they argument being sent at the start.
+# current folder is assumed to be faptras
 PATH_TO_PITCHES = "./pitches_data/pitches.txt"
 PATH_TO_HOMOGRAPHY_MATRICES = "./resources/homography_matrices/"
 PATH_TO_INITIAL_PLAYER_POSITIONS = "./resources/initial_positions_cache/"
