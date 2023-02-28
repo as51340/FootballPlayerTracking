@@ -22,10 +22,11 @@ class LastNFramesHelper:
         while not globals.stop_thread:
             time.sleep(3)
             for img in self.storage:
-                self.view_.draw_person(img, str(new_id), new_det, constants.BLACK)
+                img_copy = img.copy()  # copy of the image so we don't have multiple black ids
+                self.view_.draw_person(img_copy, str(new_id), new_det, constants.BLACK)
                 if globals.stop_thread:
                     break
-                cv.imshow(window, img)
+                cv.imshow(window, img_copy)
                 k = cv.waitKey(1) & 0xFF
                 utils.check_kill(k)
                 if k == ord('p'):

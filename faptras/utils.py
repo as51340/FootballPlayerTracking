@@ -1,3 +1,4 @@
+from typing import Dict, List, Tuple
 import os
 import time
 import sys
@@ -68,3 +69,6 @@ def pause():
         check_kill(k)
         if k == ord('p') or globals.stop_thread:
             break
+
+def to_tuple_int(coords: Tuple) -> Tuple[int, int]:
+    return int(coords[0]), int(coords[1])

@@ -8,6 +8,7 @@ from person import Player, Referee, Person
 import constants
 import view
 import resolve_helpers
+import utils
 
 class Match:
     """Represents the current state of the match.
@@ -44,13 +45,13 @@ class Match:
             return p1
         return self.team2.get_player(id)
     
-    def resolve_team_helper(self, id: int, detection_info: Tuple[int, int], team: int, jersey_number: int, name: str):
+    def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
 
         Args:
             team (str): Team name`
             id (int): Player id which needs to be added to some team.
-            detection_info (Tuple[int, int]): Initial player position in pixel space.
+            detection_info (Tuple[int, int]): Initial player position in 2D space in meters.
             jersey_number (int): Jersey number of the player. If it is referee, then it will be ignored.
 
         Returns:
@@ -111,10 +112,10 @@ class Match:
                 print(f"Ignoring id: {obj_id}")
 
     @classmethod
-    def cache_team_resolution(cls, cache_file: str):
+    def cache_team_resolution(cls, pitch: Pitch, cache_file: str):
         """Resolved initial informations about players and the referee from the cached file.
         Args:
-            match (Match): A reference to the match.
+            pitch (Pitch): A reference to the pitch.
             cache_file (str): Path to the file where all information is being saved.
 
         Returns:
@@ -136,20 +137,26 @@ class Match:
             values = list(map(lambda val: val.strip().rstrip(), line.split(',')))
             team = int(values[0])
             jersey_number = int(values[1])
-            if not match.resolve_team_helper(obj_id, initial_position, team, jersey_number, values[2]):
+            if not match.resolve_team_helper(obj_id, pitch.pixel_to_meters_positions(utils.to_tuple_int(initial_position)), team, jersey_number, values[2]):
                 return None
         return match
     
     @classmethod
-    def user_team_resolution(cls, obj_ids: List[int], detections_info: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], img: np.ndarray, window: str, cache_file: str, prompter) -> None:
+    def user_team_resolution(cls, pitch: Pitch, obj_ids: List[int], detections_info: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], img: np.ndarray, window: str, cache_file: str, prompter) -> None:
         """User manually decides about the team of the player shown on the image. If user inputs the team that is not part of the current match, the procedure is repeated for the same player.
 
         Args:
-            uncertain_objs (List[Tuple[int, Tuple[int, int]]]): All objects that need to be resolved. First item in tuple is the object id that will be shown on the image. Second item are 
-                bounding box coordinates. 
-            img (np.ndarray): A reference to the image on which players will be drawn.
-            window (str): Window name.
+            pitch (Pitch): _description_
+            obj_ids (List[int]): _description_
+            detections_info (List[Tuple[int, int]]): _description_
+            bb_info (List[Tuple[int, int, int, int]]): _description_
+            img (np.ndarray): _description_
+            window (str): _description_
+            cache_file (str): _description_
+            prompter (_type_): _description_
 
+        Returns:
+            _type_: _description_
         """
         print("Please insert the name of the first team: ")
         team_name1 = input()
@@ -166,11 +173,10 @@ class Match:
                 value = prompter.value
                 values = prompter.value.split(',')
                 values = list(map(lambda val: val.strip().rstrip(), values))
-                print(values)
                 team = int(values[0])
                 jersey_number = int(values[1])
                 try:
-                    if not match.resolve_team_helper(obj_ids[i], detections_info[i], team, jersey_number, values[2]):
+                    if not match.resolve_team_helper(obj_ids[i], pitch.pixel_to_meters_positions(detections_info[i]), team, jersey_number, values[2]):
                         print("Unknown team, please insert again...")
                     else:
                         player_cache[obj_ids[i]] = value, detections_info[i]

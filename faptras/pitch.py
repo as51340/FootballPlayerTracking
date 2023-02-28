@@ -49,8 +49,8 @@ class Pitch:
             Tuple[float, float]: Object coordinate in meters.
         """
         if self.x_dim == PitchOrientation.LENGTH:
-            return pixel_coords[0] * self.pitch_length / self.length, pixel_coords[1] * self.pitch_width / self.width
-        return pixel_coords[0] * self.pitch_width / self.width, pixel_coords[1] * self.pitch_length / self.length
+            return (pixel_coords[0] - self.upper_left_corner[0]) * self.pitch_length / self.length, (pixel_coords[1] - self.upper_left_corner[1]) * self.pitch_width / self.width
+        return (pixel_coords[0] - self.upper_left_corner[0]) * self.pitch_width / self.width, (pixel_coords[1] - self.upper_left_corner[1])  * self.pitch_length / self.length
     
     @classmethod
     def load_pitch(cls, pitch_path: str, pitch_length: int, pitch_width: int) -> Pitch:

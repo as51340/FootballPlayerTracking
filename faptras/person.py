@@ -25,7 +25,9 @@ class Person:
         Args:
             new_position (Tuple[int, int]): New person's position
         """
-        self.total_run += math.sqrt((self.current_position[0] - new_position[0])**2 + (self.current_position[1] - new_position[1])**2)
+        distance_run =  math.sqrt((self.current_position[0] - new_position[0])**2 + (self.current_position[1] - new_position[1])**2)
+        # print(f"Distance run: {distance_run}")
+        self.total_run += distance_run
         self.current_position = new_position
     
     @property

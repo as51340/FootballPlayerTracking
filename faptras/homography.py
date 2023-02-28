@@ -79,13 +79,13 @@ def calculate_homography(view_: view.View, src_img: np.ndarray, path_to_pitch: s
                 # Reinitialize image
                 src_img_copy = src_img.copy()
                 cv.setMouseCallback(constants.SRC_WINDOW, view_._select_points_wrapper, (constants.SRC_WINDOW, src_points, src_img_copy))
-                view.View.draw_2d_objects(src_img_copy, src_points)
+                view.View.draw_old_circles(src_img_copy, src_points)
             elif undo_window == constants.DST_WINDOW and dst_points:
                 dst_points.pop()
                 # Reinitialize image
                 dst_img_copy = dst_img.copy()
                 cv.setMouseCallback(constants.DST_WINDOW, view_._select_points_wrapper, (constants.DST_WINDOW, dst_points, dst_img_copy))
-                view.View.draw_2d_objects(dst_img_copy, dst_points)
+                view.View.draw_old_circles(dst_img_copy, dst_points)
         elif k == ord("s"):
             print(f"Source points: {src_points}")
             print(f"Dest points: {dst_points}")

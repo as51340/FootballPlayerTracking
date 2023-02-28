@@ -82,7 +82,17 @@ class View:
         cv.namedWindow(window_name, cv.WND_PROP_FULLSCREEN)
         monitor_info = get_offset_to_second_monitor()
         cv.setWindowProperty(window_name, cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
-        cv.moveWindow(window_name, monitor_info[0], monitor_info[1]);    
+        cv.moveWindow(window_name, monitor_info[0], monitor_info[1]);
+    
+    @classmethod
+    def draw_old_circles(cls, img, points):
+        """Draws all saved points on an image. Used for implementing undo buffer.
+        Args:
+            img (np.ndarray): A reference to the image.
+            points (List[List[int]]): Points storage.
+        """
+        for x, y in points:
+            cv.circle(img, (x,y), 5, constants.RED, -1)
         
     @classmethod
     def box_label(cls, frame: np.ndarray, bb_info: Tuple[int, int, int, int], rec_color,  label='', txt_color=constants.WHITE):

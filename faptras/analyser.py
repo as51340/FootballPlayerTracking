@@ -21,7 +21,7 @@ import resolve_helpers as resolve_helpers
 
 prompter = thread_prompter.ThreadWithReturnValue()
 
-def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, H, resolving_positions_cache: dict = None):
+def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, analytics: analytics_viewer.AnalyticsViewer, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -92,13 +92,13 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 os._exit(-1)
             
             if object_ids_in_pitch[i] not in match.ignore_ids:
-                frame_detection_int = (int(frame_detection[0]), int(frame_detection[1]))
+                frame_detection_int = utils.to_tuple_int(frame_detection)
                 view_.draw_person(frame_img, id_to_show, frame_detection_int, person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                 # If we are drawing the object, it means we can do analytics
-                person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
+                if (frame_id + 1) % analytics.run_estimation_frames == 0:
+                    person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
                 
-            
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
         resolve_helper.storage.append(frame_img)
@@ -117,9 +117,10 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             utils.pause()
         elif k == ord('r'):
             # Show analytics
-            analytics_viewer.AnalyticsViewer().show_player_run_table(match)
+            analytics.show_player_run_table(match)
         elif k == ord('q'):
             # Quit visualization
+            analytics.show_player_run_table(match)
             return True, resolving_positions_cache
         
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
@@ -132,10 +133,12 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
         to analyze data. In the future this can maybe be optimized so everything is being run online.
     Args:
     """
-    pitch_img = cv.imread(pitch.img_path, -1)
-    
+    pitch_img = cv.imread(pitch.img_path, -1) 
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
+    num_frames = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_COUNT))
+    fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
+    analytics = analytics_viewer.AnalyticsViewer(int(num_frames / fps_rate)) # sample every 1s
     extracted_file_name = utils.get_file_name(path_to_video)
     homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"
     player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + extracted_file_name + ".txt"
@@ -171,14 +174,14 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     detections_storage.pop(sorted_keys[0]) # Don't visualize the first frame
     frame_detections0, bb_info0, object_ids0 = pitch.get_objects_within(frame_detections0, bb_info0, object_ids0)
     if cache_initial_positions: 
-        match = Match.cache_team_resolution(player_cache_file)
+        match = Match.cache_team_resolution(pitch, player_cache_file)
         if not match:
-            match = Match.user_team_resolution(object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
+            match = Match.user_team_resolution(pitch, object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
             print("User needs to resolve initial setting")
         else:
             print("Using cached initial setting")
     else:
-        match = Match.user_team_resolution(object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
+        match = Match.user_team_resolution(pitch, object_ids0, frame_detections0, bb_info0, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
         print("User needs to resolve initial setting")
 
     # Window for detections
@@ -189,7 +192,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
     while True: 
-        status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, H, resolving_positions_cache)
+        status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics, resolving_positions_cache)
         # Restart the video if you didn't get any input
         if not cache_resolving and len(resolving_positions_cache) != 0:
            with open(resolving_positions_cache_file, "w") as resolving_positions_file:
