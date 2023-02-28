@@ -74,42 +74,74 @@ class Match:
         Args:
             bb_infos (Tuple[int, int, int, int]): Bounding boxes. 
             object_ids (List[int]): List of object identifiers.
-
-        Returns:
-            List[Tuple[int, int, int, int], int]: New objects' bounding boxes and identifiers.
+            detections_in_pitch (Tuple[int, int]): All 2D detections that are in the pitch.
+        Returns: Tuple of lists
         """
-        new_objects: List[Tuple[int, int, int, int], int] = []
+        new_object_detections: List[Tuple[int, int]] = []
+        new_object_bb: List[Tuple[int, int, int, int]] = []
+        new_object_ids: List[int] = []
         for i, obj_id in enumerate(object_ids):
             if obj_id not in self.ignore_ids and self.find_person_with_id(obj_id) is None:
-                new_objects.append((detections_in_pitch[i], bb_infos[i], obj_id))
-        return new_objects
+                new_object_detections.append(detections_in_pitch[i])
+                new_object_bb.append(bb_infos[i])
+                new_object_ids.append(obj_id)
+        return new_object_detections, new_object_bb, new_object_ids
     
-    def resolve_user_action(self, action: int, obj_id: int, det: Tuple[int, int], resolving_positions_cache: Dict[int, int], resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
+    def resolve_user_action_helper(self, prompt: str, obj_id: int, det: Tuple[int, int], resolving_positions_cache: Dict[int, int], new_obj_ids: List[int], existing_obj_ids: List[int], resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
+        """Helper action used when needed recursion to resolve user action.
+
+        Args:
+            prompt (str): Prompt that will be given to the thread
+            obj_id (int): Object id 
+            det (Tuple[int, int]): Detection in 2D space.
+            resolving_positions_cache (Dict[int, int]): For saving user actions.
+            new_obj_ids (List[int]): All new objects in the current frame.
+            existing_obj_ids (List[int]): All objects that exist from the previous frame.
+            resolve_helper (resolve_helpers.LastNFramesHelper): Visualizatio helper engine.
+            prompter (_type_): Thread prompter
+
+        Returns:
+            _type_: _description_
+        """
+        prompter.set_execution_config(prompt)
+        resolve_helper.visualize(constants.DETECTIONS_WINDOW, obj_id, det)
+        new_action =  int(prompter.value)
+        self.resolve_user_action(new_action, obj_id, det, resolving_positions_cache, new_obj_ids, existing_obj_ids, resolve_helper, prompter)
+        
+    
+    def resolve_user_action(self, action: int, obj_id: int, det: Tuple[int, int], resolving_positions_cache: Dict[int, int], new_obj_ids: List[int], existing_obj_ids: List[int], resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
         """Resolves user input based on a few simple conditions.
 
         Args:
             action (int): Action that user requested.
             obj_id (int): Id of the object that needs resolving
+            det (Tuple[int, int]): Detection in 2D space in pixels.
+            resolving_positions_cache (Dict[int, int]): For saving user actions.
+            new_obj_ids (List[int]): All new objects in the current frame.
+            existing_obj_ids (List[int]): All objects that exist from the previous frame.
             resolve_helper (resolve_helpers.LastNFramesHelper): Instance of the helper.
+            prompter Reference to the prompter thread
         """
         resolving_positions_cache[obj_id] = action  # if recursively call, it will be overwritten
         if action == 0:
             self.referee.ids.append(obj_id)
         elif action == -1:
-            print(f"Ignoring id: {obj_id}")
             self.ignore_ids.append(obj_id)  # from now on ignore this id
         elif action == -2:
-            prompter.set_execution_config(constants.prompt_input)
-            resolve_helper.visualize(constants.DETECTIONS_WINDOW, obj_id, det)
-            new_action = int(prompter.value)
-            self.resolve_user_action(new_action, obj_id, det, resolving_positions_cache, resolve_helper, prompter)
+            self.resolve_user_action_helper(constants.prompt_input, obj_id, det, resolving_positions_cache, new_obj_ids, 
+                                            existing_obj_ids, resolve_helper, prompter)
         else:
-            ex_player = self.find_player_with_id(action)
-            if ex_player is not None:
-                print(f"Found ex player with ids: {ex_player.ids}")
-                ex_player.ids.append(obj_id)
+            if action not in new_obj_ids and action in existing_obj_ids:  # Don't allow assigning id to the player that is already shown in the frame
+                self.resolve_user_action_helper("Please insert again, person with this id is already shown in the current frame", obj_id, det, 
+                                                resolving_positions_cache, new_obj_ids, existing_obj_ids, resolve_helper, prompter)
             else:
-                print(f"Ignoring id: {obj_id}")
+                ex_player = self.find_player_with_id(action)
+                if ex_player is not None:
+                    print(f"Found ex player with ids: {ex_player.ids}")
+                    ex_player.ids.append(obj_id)
+                else:
+                    self.resolve_user_action_helper("Please insert again, this id doesn't exist.", obj_id, det, resolving_positions_cache, 
+                                                    new_obj_ids, existing_obj_ids, resolve_helper, prompter)
 
     @classmethod
     def cache_team_resolution(cls, pitch: Pitch, cache_file: str):

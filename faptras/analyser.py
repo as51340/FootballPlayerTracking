@@ -57,8 +57,10 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Real video
         _, video_frame = detections_vid_capture.read()
         # Check whether we will have to deal with new object in this frame
-        new_objects = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
-        for detection_info_new_id, bb_info_new_id, new_obj_id in new_objects:
+        new_object_detections, new_object_bb_info, new_obj_ids = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
+        # Set is necessary but shouldn't be a problem since all new object ids should be different
+        existing_ids_in_frame = [x for x in object_ids_in_pitch if x not in new_obj_ids]  # All ids that are shown in the frame and that are known from before
+        for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_object_detections, new_object_bb_info, new_obj_ids):
             if cache_resolving:
                 action = int(resolving_positions_cache[new_obj_id])
             else:
@@ -68,7 +70,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
                 view.View.show_img_while_not_killed(constants.VIDEO_WINDOW, new_frame)
                 action = int(prompter.value)
-            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, resolve_helper, prompter)    
+            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_obj_ids, existing_ids_in_frame, resolve_helper, prompter)    
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
         
