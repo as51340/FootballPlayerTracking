@@ -17,6 +17,7 @@ class Match:
         self.team1 = Team(team1_name, constants.BLUE)
         self.team2 = Team(team2_name, constants.RED)
         self.ignore_ids = []  # IDS that are ignored. They get added into this data structure from the user's side, e.g. assistant referee or any other object that user doesn't want to track anymore.
+        self.initial_ids = set()  # initial ids in the match. Needed for automatic AI resolver.
        
     def find_person_with_id(self, id: int) -> Person:
         """Checks whether the person with id exists in the Match structure.
@@ -59,13 +60,14 @@ class Match:
         """
         if team == 0:
             self.team1.players.append(Player(name, jersey_number, id, detection_info))
-            return True
         elif team == 1:
             self.team2.players.append(Player(name, jersey_number, id, detection_info))
-            return True
         elif team == 2:
             self.referee = Referee(name, id, constants.YELLOW, detection_info)
-            return True
+
+        if team < 3:  # team1, team2 or referee
+            self.initial_ids.add(id)
+            return True        
         return False
 
     def get_new_objects(self, bb_infos: Tuple[int, int, int, int], object_ids: List[int], detections_in_pitch: List[Tuple[int, int]]) -> List[int]:
@@ -110,7 +112,7 @@ class Match:
         
     
     def resolve_user_action(self, action: int, obj_id: int, det: Tuple[int, int], resolving_positions_cache: Dict[int, int], new_obj_ids: List[int], existing_obj_ids: List[int], resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
-        """Resolves user input based on a few simple conditions.
+        """Resolves user input based on a few simple conditions. Don't allow adding new id by yourself, only YOLO can generate new id.
 
         Args:
             action (int): Action that user requested.
@@ -137,7 +139,6 @@ class Match:
             else:
                 ex_player = self.find_player_with_id(action)
                 if ex_player is not None:
-                    print(f"Found ex player with ids: {ex_player.ids}")
                     ex_player.ids.append(obj_id)
                 else:
                     self.resolve_user_action_helper("Please insert again, this id doesn't exist.", obj_id, det, resolving_positions_cache, 

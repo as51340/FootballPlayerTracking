@@ -17,7 +17,7 @@ DrawMode = Enum('DrawMode', ['CIRCLE', 'TEXT'])
 
 TEXT_FACE = cv.FONT_HERSHEY_DUPLEX
 TEXT_SCALE = 0.5
-TEXT_THICKNESS = 2
+TEXT_THICKNESS = 1
 
 class View:
     

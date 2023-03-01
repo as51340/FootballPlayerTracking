@@ -18,10 +18,12 @@ import utils
 import homography
 import thread_prompter
 import resolve_helpers as resolve_helpers
+import ai_resolver
+import sanity_checker
 
 prompter = thread_prompter.ThreadWithReturnValue()
 
-def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, analytics: analytics_viewer.AnalyticsViewer, resolving_positions_cache: dict = None):
+def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -53,6 +55,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Playing birds-eye view
         frame_img = pitch_img.copy()
         # Inefficient because we are creating copy of the list
+        # Objects_ids_in_pitch must not be a set
         detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = pitch.get_objects_within(detections_per_frame, bb_info, object_ids)
         # Real video
         _, video_frame = detections_vid_capture.read()
@@ -64,15 +67,22 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             if cache_resolving:
                 action = int(resolving_positions_cache[new_obj_id])
             else:
-                print(f"New object id: {new_obj_id}")
-                new_frame = video_frame.copy()
-                prompter.set_execution_config(constants.prompt_input)
-                view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
-                view.View.show_img_while_not_killed(constants.VIDEO_WINDOW, new_frame)
-                action = int(prompter.value)
+                action = resolver.resolve(match, new_obj_ids, existing_ids_in_frame)
+                if action is None or isinstance(action, list):  # if resolver wasn't able to resolve it by itself then fallback to manual resolution
+                    prompt = constants.prompt_input
+                    if action is not None:
+                        prompt += f"Missing ids are: {action}"
+                    new_frame = video_frame.copy()
+                    prompter.set_execution_config(prompt)
+                    view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
+                    view.View.show_img_while_not_killed(constants.VIDEO_WINDOW, new_frame)
+                    action = int(prompter.value)
             match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_obj_ids, existing_ids_in_frame, resolve_helper, prompter)    
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
+        
+        # Before visualizing, run sanity check
+        sanitizer.check(object_ids_in_pitch)
         
         # Process per detection
         for i, frame_detection in enumerate(detections_in_pitch):
@@ -89,7 +99,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             elif team2_player is not None:
                 person = team2_player
                 person_color, id_to_show = match.team2.color, str(team2_player.label)
-            elif object_ids_in_pitch[i] not in match.ignore_ids:  # validation flag
+            elif object_ids_in_pitch[i] not in match.ignore_ids:  # validation flag, TODO: probably can go under sanitizer
                 print(f"New object: {object_ids_in_pitch[i]}")
                 os._exit(-1)
             
@@ -98,7 +108,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 view_.draw_person(frame_img, id_to_show, frame_detection_int, person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                 # If we are drawing the object, it means we can do analytics
-                if (frame_id + 1) % analytics.run_estimation_frames == 0:
+                if (frame_id + 1) % analytics_display.run_estimation_frames == 0:
                     person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
                 
         # Display
@@ -119,10 +129,10 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             utils.pause()
         elif k == ord('r'):
             # Show analytics
-            analytics.show_player_run_table(match)
+            analytics_display.show_player_run_table(match)
         elif k == ord('q'):
             # Quit visualization
-            analytics.show_player_run_table(match)
+            analytics_display.show_player_run_table(match)
             return True, resolving_positions_cache
         
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
@@ -138,9 +148,15 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     pitch_img = cv.imread(pitch.img_path, -1) 
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
+    # Create analytical display
     num_frames = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_COUNT))
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
-    analytics = analytics_viewer.AnalyticsViewer(int(num_frames / fps_rate)) # sample every 1s
+    analytics_display = analytics_viewer.AnalyticsViewer(int(num_frames / fps_rate)) # sample every 1s
+    # Create ai_resolver object
+    resolver = ai_resolver.Resolver()
+    # Create sanitizer object
+    sanitizer = sanity_checker.SanityChecker()
+    # Get names of the caching files
     extracted_file_name = utils.get_file_name(path_to_video)
     homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"
     player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + extracted_file_name + ".txt"
@@ -194,7 +210,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
     while True: 
-        status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics, resolving_positions_cache)
+        status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, resolving_positions_cache)
         # Restart the video if you didn't get any input
         if not cache_resolving and len(resolving_positions_cache) != 0:
            with open(resolving_positions_cache_file, "w") as resolving_positions_file:
@@ -226,7 +242,6 @@ if __name__ == "__main__":
     parser.add_argument("--cache-resolving", required=False, default=False, action="store_true", help="Whether to cache user resolving ids throughout the match")
     args = parser.parse_args()
     
-    print(args.pitch_length, args.pitch_width)
     pitch = Pitch.load_pitch(args.pitch_path, args.pitch_length, args.pitch_width)
     # Setup view
     view_ = view.View(view.ViewMode.NORMAL)
