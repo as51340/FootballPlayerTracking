@@ -52,20 +52,19 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # arr = [bb_info[0][0] + 0.5 * bb_info[0][2], bb_info[0][1] + bb_info[0][3], 1]
         # arr = H@np.array(arr)
         # print([arr[0] / arr[2], arr[1] / arr[2]], detections_per_frame[0])
-        # Playing birds-eye view
-        frame_img_det = pitch_img.copy()
-        # Inefficient because we are creating copy of the list
-        # Objects_ids_in_pitch must not be a set
-        detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = pitch.get_objects_within(detections_per_frame, bb_info, object_ids)
-        # This should probably be somehow optimized
-        detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = sanitizer.clear_already_resolved(detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch, resolving_positions_cache)
+        
         # Real video
         _, video_frame = detections_vid_capture.read()
+        # Playing birds-eye view
+        frame_img_det = pitch_img.copy()
+        # This should probably be somehow optimized
+        detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch = sanitizer.clear_already_resolved(*pitch.get_objects_within(detections_per_frame, bb_info, object_ids), resolving_positions_cache)
         # Check whether we will have to deal with new object in this frame
-        new_object_detections, new_object_bb_info, new_objects_id = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
-        # Set is necessary but shouldn't be a problem since all new object ids should be different
-        existing_objects_detection, e_, existing_objects_id = utils.get_existing_objects(detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch, new_objects_id)
-        assert set(existing_objects_id).union(set(new_objects_id)) == set(object_ids_in_pitch)
+        new_object_detections, new_object_bb_info, new_objects_id = match.get_new_objects(bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch)
+        # All objects that can be resolved from before
+        existing_objects_detection, _, existing_objects_id = utils.get_existing_objects(detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, new_objects_id)
+        assert set(existing_objects_id).union(set(new_objects_id)) == set(objects_id_in_pitch)
+        
         # Resolving step 
         for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_object_detections, new_object_bb_info, new_objects_id):
             # If it is cached, use cached option
@@ -85,31 +84,31 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                         view_.draw_person(new_frame_det, str(existing_id_to_show), existing_objects_detection[i], existing_person_color)
                     for i in range(len(new_objects_id)):
                         view_.draw_person(new_frame_det, str(new_obj_id), detection_info_new_id, constants.BLACK)
-                    
                     prompter.set_execution_config(prompt)
                     view.View.box_label(new_frame_bb, bb_info_new_id, constants.BLACK, new_obj_id)
                     view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, new_frame_det])
                     action = int(prompter.value)
             match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)    
+        
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
         
         # Before visualizing, run sanity check
-        sanitizer.check(object_ids_in_pitch)
+        sanitizer.check(objects_id_in_pitch)
         
         # Process per detection
         showing_ids = set()
         for i, frame_detection in enumerate(detections_in_pitch):
-            if object_ids_in_pitch[i] in match.ignore_ids:
+            if objects_id_in_pitch[i] in match.ignore_ids:
                 continue
-            person, person_color, id_to_show = match.get_info_for_drawing(object_ids_in_pitch[i])
+            person, person_color, id_to_show = match.get_info_for_drawing(objects_id_in_pitch[i])
 
             # Validation step
             if id_to_show in showing_ids:
                 print(f"Id {id_to_show} already drawn")
             showing_ids.add(id_to_show)
             
-            if object_ids_in_pitch[i] not in match.ignore_ids:
+            if objects_id_in_pitch[i] not in match.ignore_ids:
                 frame_detection_int = utils.to_tuple_int(frame_detection)
                 view_.draw_person(frame_img_det, id_to_show, frame_detection_int, person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
@@ -154,14 +153,18 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     pitch_img = cv.imread(pitch.img_path, -1) 
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
+    
     # Create analytical display
     num_frames = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_COUNT))
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
     analytics_display = analytics_viewer.AnalyticsViewer(int(num_frames / fps_rate)) # sample every 1s
+    
     # Create ai_resolver object
     resolver = ai_resolver.Resolver()
+    
     # Create sanitizer object
     sanitizer = sanity_checker.SanityChecker()
+    
     # Get names of the caching files
     extracted_file_name = utils.get_file_name(path_to_video)
     homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"

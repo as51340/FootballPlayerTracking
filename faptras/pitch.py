@@ -113,23 +113,23 @@ class Pitch:
             return True
         return False
 
-    def get_objects_within(self, detections, bb_info, object_ids) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int, int, int]], List[int]]:
+    def get_objects_within(self, detections: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], objects_id: List[int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int, int, int]], List[int]]:
         """Returns detections (2D objects), bounding boxes and object_ids only of objects which are within the pitch boundary based on the 2D image.
 
         Args:
-            detections (_type_): 2D detections.
-            bb_info (_type_): Bounding box information.
-            object_ids (_type_): Objects ids
+            detections (List[Tuple[int, int]]): 2D detections.
+            bb_info (List[Tuple[int, int, int, int]]): Bounding box information.
+            object_ids (List[int]): Objects id.
 
         Returns:
             2d detections, bounding boxes and ids of the objects inside the pitch.
         """
         detections_in_pitch, bb_info_ids, object_ids_in_pitch = [], [], []
-        for i, detection in enumerate(detections):
-            if not self.is_detection_outside(detection[0], detection[1]):
-                detections_in_pitch.append(detection)
+        for i in range(len(detections)):
+            if not self.is_detection_outside(detections[i][0], detections[i][1]):
+                detections_in_pitch.append(detections[i])
                 bb_info_ids.append(bb_info[i])
-                object_ids_in_pitch.append(object_ids[i])
+                object_ids_in_pitch.append(objects_id[i])
         return detections_in_pitch, bb_info_ids, object_ids_in_pitch
     
 if __name__ == "__main__":
