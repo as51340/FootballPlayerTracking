@@ -57,30 +57,40 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Inefficient because we are creating copy of the list
         # Objects_ids_in_pitch must not be a set
         detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = pitch.get_objects_within(detections_per_frame, bb_info, object_ids)
+        # This should probably be somehow optimized
         detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = sanitizer.clear_already_resolved(detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch, resolving_positions_cache)
         # Real video
         _, video_frame = detections_vid_capture.read()
         # Check whether we will have to deal with new object in this frame
-        new_object_detections, new_object_bb_info, new_obj_ids = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
+        new_object_detections, new_object_bb_info, new_objects_id = match.get_new_objects(bb_info_in_pitch, object_ids_in_pitch, detections_in_pitch)
         # Set is necessary but shouldn't be a problem since all new object ids should be different
-        existing_ids_in_frame = [x for x in object_ids_in_pitch if x not in new_obj_ids]  # All ids that are shown in the frame and that are known from before
-        for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_object_detections, new_object_bb_info, new_obj_ids):
+        existing_objects_detection, e_, existing_objects_id = utils.get_existing_objects(detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch, new_objects_id)
+        assert set(existing_objects_id).union(set(new_objects_id)) == set(object_ids_in_pitch)
+        # Resolving step 
+        for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_object_detections, new_object_bb_info, new_objects_id):
+            # If it is cached, use cached option
             if cache_resolving:
                 action = int(resolving_positions_cache[new_obj_id])
             else:
-                action = resolver.resolve(match, new_obj_ids, existing_ids_in_frame)
+                action = resolver.resolve(match, new_objects_id, existing_objects_id)
                 if action is None or isinstance(action, list):  # if resolver wasn't able to resolve it by itself then fallback to manual resolution
                     prompt = constants.prompt_input
                     if action is not None:
                         prompt += f"Missing ids are: {action}"
                     new_frame_bb = video_frame.copy()
+                    new_frame_det = pitch_img.copy()
+                    # Draw known objects from frame before
+                    for i in range(len(existing_objects_id)):
+                        _, existing_person_color, existing_id_to_show = match.get_info_for_drawing(existing_objects_id[i])
+                        view_.draw_person(new_frame_det, str(existing_id_to_show), existing_objects_detection[i], existing_person_color)
+                    for i in range(len(new_objects_id)):
+                        view_.draw_person(new_frame_det, str(new_obj_id), detection_info_new_id, constants.BLACK)
+                    
                     prompter.set_execution_config(prompt)
-                    # view_.draw_person(old_img_det, str(new_obj_id), detection_info_new_id, constants.BLACK)
                     view.View.box_label(new_frame_bb, bb_info_new_id, constants.BLACK, new_obj_id)
-                    # view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, old_img_det])
-                    view.View.show_img_while_not_killed([constants.VIDEO_WINDOW], [new_frame_bb])
+                    view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, new_frame_det])
                     action = int(prompter.value)
-            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_obj_ids, existing_ids_in_frame, resolve_helper, prompter)    
+            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)    
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
         
@@ -90,23 +100,11 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Process per detection
         showing_ids = set()
         for i, frame_detection in enumerate(detections_in_pitch):
-            id_to_show = str(object_ids_in_pitch[i])
-            team1_player = match.team1.get_player(object_ids_in_pitch[i])
-            team2_player = match.team2.get_player(object_ids_in_pitch[i])
-            person = None
-            if object_ids_in_pitch[i] in match.referee.ids:
-                person = match.referee
-                person_color = match.referee.color
-            elif team1_player is not None:
-                person = team1_player
-                person_color, id_to_show = match.team1.color, str(team1_player.label)
-            elif team2_player is not None:
-                person = team2_player
-                person_color, id_to_show = match.team2.color, str(team2_player.label)
-            elif object_ids_in_pitch[i] not in match.ignore_ids:  # validation flag, TODO: probably can go under sanitizer
-                print(f"New object: {object_ids_in_pitch[i]}")
-                os._exit(-1)
-            
+            if object_ids_in_pitch[i] in match.ignore_ids:
+                continue
+            person, person_color, id_to_show = match.get_info_for_drawing(object_ids_in_pitch[i])
+
+            # Validation step
             if id_to_show in showing_ids:
                 print(f"Id {id_to_show} already drawn")
             showing_ids.add(id_to_show)

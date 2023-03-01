@@ -9,6 +9,7 @@ import constants
 import view
 import resolve_helpers
 import utils
+import os
 
 class Match:
     """Represents the current state of the match.
@@ -45,6 +46,24 @@ class Match:
         if p1 is not None:
             return p1
         return self.team2.get_player(id)
+    
+    def get_info_for_drawing(self, input_id: int):
+        """Returns info needed for drawing based on the given id.
+
+        Args:
+            input_id (int): Id of the object that needs to be drawn.
+
+        Returns:
+            Tuple[Person, Color, str]: Reference to person, color and its id to be shown.
+        """
+        team1_player = self.team1.get_player(input_id)
+        team2_player = self.team2.get_player(input_id)
+        if input_id in self.referee.ids:
+            return self.referee, self.referee.color, str(input_id)
+        elif team1_player is not None:
+            return team1_player, self.team1.color, str(team1_player.label)
+        elif team2_player is not None:
+            return team2_player, self.team2.color, str(team2_player.label)
     
     def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.

@@ -72,3 +72,24 @@ def pause():
 
 def to_tuple_int(coords: Tuple) -> Tuple[int, int]:
     return int(coords[0]), int(coords[1])
+
+def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
+    """This method returns information about all objects that don't need to be resolved and about which we already have some information.
+
+    Args:
+        detections_in_pitch (List[Tuple[int, int]]): De
+        bb_info_in_pitch (List[Tuple[int, int, int, int]]): _description_
+        new_object_id (List[int]): _description_
+        object_ids_in_pitch (List[int]): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    existing_objects_detections, existing_objects_bb_info, existing_objects_ids = [], [], []
+    for i in range(len(object_ids_in_pitch)):
+        if object_ids_in_pitch[i] not in new_objects_id:
+            existing_objects_detections.append(detections_in_pitch[i])
+            existing_objects_bb_info.append(bb_info_in_pitch[i])
+            existing_objects_ids.append(object_ids_in_pitch[i])
+    return existing_objects_detections, existing_objects_bb_info, existing_objects_ids
+    
