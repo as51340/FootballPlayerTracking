@@ -1,6 +1,6 @@
 # class used for handling view, we will use it for refactoring 
 from enum import Enum
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
 
 import cv2 as cv
 import numpy as np
@@ -64,18 +64,20 @@ class View:
             cv.putText(frame_img, text, text_origin, TEXT_FACE, TEXT_SCALE, color, TEXT_THICKNESS, cv.LINE_AA)
 
     @classmethod
-    def show_img_while_not_killed(cls, window: str, frame: np.ndarray):
-        """Shows image while not killed from the other thread.
+    def show_img_while_not_killed(cls, windows: List[str], frames: List[np.ndarray]):
+        """Shows image while not killed from the other thread. It can also show multiple images on its windows.
 
         Args:
             window (str): on which window frame needs to be shown.
-            frame (np.ndarray): A reference to the frame.
+            frames (np.ndarray): A reference to the frame.
         """
         globals.stop_thread = False
         while not globals.stop_thread:
-            k = cv.waitKey(1) & 0xFF
-            cv.imshow(window, frame)
-            utils.check_kill(k)
+            for i in range(len(windows)):
+                window, frame = windows[i], frames[i]
+                k = cv.waitKey(1) & 0xFF
+                cv.imshow(window, frame)
+                utils.check_kill(k)
     
     @classmethod
     def full_screen_on_monitor(cls, window_name):

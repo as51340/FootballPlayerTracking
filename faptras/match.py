@@ -202,7 +202,7 @@ class Match:
             view.View.box_label(show_frame, bb_obj_info, constants.BLACK, obj_ids[i])
             while True:
                 prompter.set_execution_config("Insert 0 for the first team, 1 for the second and 2 for the referee, jersey_number or -1, name: ")
-                view.View.show_img_while_not_killed(window, show_frame)
+                view.View.show_img_while_not_killed([window], [show_frame])
                 value = prompter.value
                 values = prompter.value.split(',')
                 values = list(map(lambda val: val.strip().rstrip(), values))

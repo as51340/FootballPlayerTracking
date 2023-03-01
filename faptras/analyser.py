@@ -45,18 +45,19 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         resolving_positions_cache = dict()
         cache_resolving = False
     
-    resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)   
-        
+    resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)
+    
     # Run visualizations
     for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
         # arr = [bb_info[0][0] + 0.5 * bb_info[0][2], bb_info[0][1] + bb_info[0][3], 1]
         # arr = H@np.array(arr)
         # print([arr[0] / arr[2], arr[1] / arr[2]], detections_per_frame[0])
         # Playing birds-eye view
-        frame_img = pitch_img.copy()
+        frame_img_det = pitch_img.copy()
         # Inefficient because we are creating copy of the list
         # Objects_ids_in_pitch must not be a set
         detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = pitch.get_objects_within(detections_per_frame, bb_info, object_ids)
+        detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch = sanitizer.clear_already_resolved(detections_in_pitch, bb_info_in_pitch, object_ids_in_pitch, resolving_positions_cache)
         # Real video
         _, video_frame = detections_vid_capture.read()
         # Check whether we will have to deal with new object in this frame
@@ -72,10 +73,12 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                     prompt = constants.prompt_input
                     if action is not None:
                         prompt += f"Missing ids are: {action}"
-                    new_frame = video_frame.copy()
+                    new_frame_bb = video_frame.copy()
                     prompter.set_execution_config(prompt)
-                    view.View.box_label(new_frame, bb_info_new_id, constants.BLACK, new_obj_id)
-                    view.View.show_img_while_not_killed(constants.VIDEO_WINDOW, new_frame)
+                    # view_.draw_person(old_img_det, str(new_obj_id), detection_info_new_id, constants.BLACK)
+                    view.View.box_label(new_frame_bb, bb_info_new_id, constants.BLACK, new_obj_id)
+                    # view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, old_img_det])
+                    view.View.show_img_while_not_killed([constants.VIDEO_WINDOW], [new_frame_bb])
                     action = int(prompter.value)
             match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_obj_ids, existing_ids_in_frame, resolve_helper, prompter)    
         # Wait for the new key
@@ -85,6 +88,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         sanitizer.check(object_ids_in_pitch)
         
         # Process per detection
+        showing_ids = set()
         for i, frame_detection in enumerate(detections_in_pitch):
             id_to_show = str(object_ids_in_pitch[i])
             team1_player = match.team1.get_player(object_ids_in_pitch[i])
@@ -103,17 +107,21 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 print(f"New object: {object_ids_in_pitch[i]}")
                 os._exit(-1)
             
+            if id_to_show in showing_ids:
+                print(f"Id {id_to_show} already drawn")
+            showing_ids.add(id_to_show)
+            
             if object_ids_in_pitch[i] not in match.ignore_ids:
                 frame_detection_int = utils.to_tuple_int(frame_detection)
-                view_.draw_person(frame_img, id_to_show, frame_detection_int, person_color)
+                view_.draw_person(frame_img_det, id_to_show, frame_detection_int, person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                 # If we are drawing the object, it means we can do analytics
                 if (frame_id + 1) % analytics_display.run_estimation_frames == 0:
                     person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
                 
         # Display
-        cv.imshow(constants.DETECTIONS_WINDOW, frame_img)
-        resolve_helper.storage.append(frame_img)
+        cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
+        resolve_helper.storage.append(frame_img_det)
         cv.imshow(constants.VIDEO_WINDOW, video_frame)
         
         # Handle key-press
