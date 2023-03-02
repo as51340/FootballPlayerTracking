@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple
 import os
 import time
 import sys
+import math
 
 import numpy as np
 import cv2 as cv
@@ -55,7 +56,7 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
             objects.append(object_id)
             bb_info.append([int(bb_left), int(bb_top), int(bb_width), int(bb_height)])
             last_frame_id = frame_id
-        print(f"Reading: {frame_id} frames took: {time.time() - start_time}s")
+        print(f"Reading: {frame_id} frames took: {(time.time() - start_time):.2f}s")
         return storage
 
 def check_kill(k):
@@ -72,6 +73,16 @@ def pause():
 
 def to_tuple_int(coords: Tuple) -> Tuple[int, int]:
     return int(coords[0]), int(coords[1])
+
+def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
+    unseen_frames = []
+    for missing_id in missing_ids:
+        unseen_frames.append(frame_id - match_.find_person_with_id(missing_id).last_seen_frame_id)
+    return unseen_frames        
+
+def calculate_euclidean_distance(current_position: Tuple[float, float], new_position: Tuple[float, float]):
+    return math.sqrt((current_position[0] - new_position[0])**2 + (current_position[1] - new_position[1])**2)
+
 
 def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
     """This method returns information about all objects that don't need to be resolved and about which we already have some information.

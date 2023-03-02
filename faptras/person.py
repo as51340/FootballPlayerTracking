@@ -1,9 +1,9 @@
 from typing import List, Tuple
-import math
+import utils
 
 class Person:
     
-    def __init__(self, name: str, initial_id: int, initial_position: Tuple[int, int]) -> None:
+    def __init__(self, name: str, initial_id: int, initial_position: Tuple[float, float]) -> None:
         """Referees and players will have initial_id. This is different from player's jersey number. All persons can have multiple ids -> those are ids given by the detection algorithm.
 
         Args:
@@ -13,21 +13,27 @@ class Person:
         """
         self.name = name
         self.ids: List[int] = [initial_id]
-        self.current_position: Tuple[int, int] = int(initial_position[0]), int(initial_position[1])
+        self.current_position: Tuple[float, float] = initial_position
+        self.sum_pos_x, self.sum_pos_y = initial_position[0], initial_position[1]
+        self.total_frames = 1
         self.total_run = 0  # How much player run estimated in meters
+        self.last_seen_frame_id = 0
     
 
-    def update_total_run(self, new_position: Tuple[int, int]) -> None:
+    def update_total_run(self, new_position: Tuple[float, float]) -> None:
         """Updates the amount that player run. The distance is calculated as Euclidean distance between last two person's positions.
         Current position and new position are in meters units.
         z = math.sqrt((x1-x2)**2 + (y1 - y2)**2)
 
         Args:
-            new_position (Tuple[int, int]): New person's position
+            new_position (Tuple[float, float]): New person's position
         """
-        distance_run =  math.sqrt((self.current_position[0] - new_position[0])**2 + (self.current_position[1] - new_position[1])**2)
+        distance_run = utils.calculate_euclidean_distance(self.current_position, new_position)
         # print(f"Distance run: {distance_run}")
         self.total_run += distance_run
+        self.sum_pos_x += new_position[0]
+        self.sum_pos_y += new_position[1]
+        self.total_frames += 1
         self.current_position = new_position
     
     @property
