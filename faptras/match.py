@@ -153,14 +153,14 @@ class Match:
                                             existing_obj_ids, resolve_helper, prompter)
         else:
             if action not in new_obj_ids and action in existing_obj_ids:  # Don't allow assigning id to the player that is already shown in the frame
-                self.resolve_user_action_helper("Please insert again, person with this id is already shown in the current frame", obj_id, det, 
+                self.resolve_user_action_helper(f"Please insert again, person with id {action} is already shown in the current frame", obj_id, det, 
                                                 resolving_positions_cache, new_obj_ids, existing_obj_ids, resolve_helper, prompter)
             else:
                 ex_player = self.find_player_with_id(action)
                 if ex_player is not None:
                     ex_player.ids.append(obj_id)
                 else:
-                    self.resolve_user_action_helper("Please insert again, this id doesn't exist.", obj_id, det, resolving_positions_cache, 
+                    self.resolve_user_action_helper(f"Please insert again, person with id {action} doesn't exist.", obj_id, det, resolving_positions_cache, 
                                                     new_obj_ids, existing_obj_ids, resolve_helper, prompter)
 
     @classmethod

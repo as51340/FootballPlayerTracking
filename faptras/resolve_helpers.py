@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Deque
 from collections import deque
 import time
 
@@ -14,7 +14,7 @@ class LastNFramesHelper:
     
     def __init__(self, n: int, view_: view.View) -> None:
         self.n = n
-        self.storage = deque(maxlen=n)
+        self.storage: Deque = deque(maxlen=n)
         self.view_ = view_
         
     def visualize(self, window: str, new_id: int, new_det: Tuple[int, int]):

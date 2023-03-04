@@ -3,11 +3,25 @@ import os
 import time
 import sys
 import math
+from enum import Enum
+from functools import total_ordering
 
 import numpy as np
 import cv2 as cv
 
 import globals
+
+@total_ordering
+class SprintCategory(Enum):
+    def __le__(self, b):
+        return self.value <= b.value
+    
+    WALKING = 1
+    EASY = 2
+    MODERATE = 3
+    FAST = 4
+    VERY_FAST = 5
+
 
 def get_file_name(path: str) -> str:
     """Extracts file name from the path. E.g. for path /user/video/t7.mp4 returns t7
@@ -83,6 +97,19 @@ def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
 def calculate_euclidean_distance(current_position: Tuple[float, float], new_position: Tuple[float, float]):
     return math.sqrt((current_position[0] - new_position[0])**2 + (current_position[1] - new_position[1])**2)
 
+def calculate_speed_magnitude(vx: float, vy: float) -> float:
+    return math.sqrt(vx**2 + vy**2)
+
+def get_sprint_category(v: float) -> SprintCategory:
+    if v < 1.9444:
+        return SprintCategory.WALKING
+    elif v >= 1.9444 and v < 3.8889:
+        return SprintCategory.EASY
+    elif v >= 3.8889 and v < 5.2778:
+        return SprintCategory.MODERATE
+    elif v >= 5.2778 and v < 6.9444:
+        return SprintCategory.FAST
+    return SprintCategory.VERY_FAST
 
 def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
     """This method returns information about all objects that don't need to be resolved and about which we already have some information.

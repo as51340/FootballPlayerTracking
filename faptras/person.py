@@ -1,5 +1,8 @@
-from typing import List, Tuple
+from typing import List, Tuple, Deque, Dict
+from collections import deque, defaultdict
+
 import utils
+import constants
 
 class Person:
     
@@ -15,10 +18,12 @@ class Person:
         self.ids: List[int] = [initial_id]
         self.current_position: Tuple[float, float] = initial_position
         self.sum_pos_x, self.sum_pos_y = initial_position[0], initial_position[1]
-        self.total_frames = 1
+        self.total_times_seen = 1
         self.total_run = 0  # How much player run estimated in meters
         self.last_seen_frame_id = 0
-    
+        self.speeds: Deque[float] = deque()  # needed just as cache
+        self.sprint_categories: Dict[utils.SprintCategory, List[float]] = defaultdict(list)
+        self.current_sprint_category = None
 
     def update_total_run(self, new_position: Tuple[float, float]) -> None:
         """Updates the amount that player run. The distance is calculated as Euclidean distance between last two person's positions.
@@ -28,12 +33,32 @@ class Person:
         Args:
             new_position (Tuple[float, float]): New person's position
         """
+        # Distance update
         distance_run = utils.calculate_euclidean_distance(self.current_position, new_position)
-        # print(f"Distance run: {distance_run}")
         self.total_run += distance_run
         self.sum_pos_x += new_position[0]
         self.sum_pos_y += new_position[1]
-        self.total_frames += 1
+        # Speed update
+        vx_local = new_position[0] - self.current_position[0]
+        vy_local = new_position[1] - self.current_position[1]
+        v = utils.calculate_speed_magnitude(vx_local, vy_local)
+        self.speeds.append(v)
+        if len(self.speeds) == constants.SPEED_AVG_NUM:
+            speed_avg = sum(self.speeds) / constants.SPEED_AVG_NUM
+            sprint_category = utils.get_sprint_category(speed_avg)
+            self.speeds.popleft()
+            if self.current_sprint_category is None:
+                self.current_sprint_category = sprint_category
+                self.start_sprint_position = new_position
+            elif sprint_category < self.current_sprint_category:
+                sprint_distance = utils.calculate_euclidean_distance(self.start_sprint_position, new_position)
+                self.sprint_categories[self.current_sprint_category].append(sprint_distance)
+                self.start_sprint_position = new_position
+                self.current_sprint_category = sprint_category
+            elif sprint_category > self.current_sprint_category:
+                self.current_sprint_category = sprint_category
+                
+        self.total_times_seen += 1
         self.current_position = new_position
     
     @property

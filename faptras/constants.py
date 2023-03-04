@@ -13,4 +13,4 @@ VIDEO_WINDOW = "vid"
 prompt_input = "Do you recognize object on the image? If new object shows anything except referee and players, enter -1. \
 Otherwise, if player is shown on the image please enter its jersey number (previous tracking id) and if the image shows referee, enter 0. "  # currently the user will enter detection id
 MAX_SPEED = 11.5  # in m/s
-
+SPEED_AVG_NUM = 10

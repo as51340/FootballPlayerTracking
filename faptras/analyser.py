@@ -59,35 +59,53 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # This should probably be somehow optimized
         detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch = sanitizer.clear_already_resolved(*pitch.get_objects_within(detections_per_frame, bb_info, object_ids), resolving_positions_cache)
         # Check whether we will have to deal with new object in this frame
-        new_object_detections, new_object_bb_info, new_objects_id = match.get_new_objects(bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch)
+        new_objects_detection, new_objects_bb, new_objects_id = match.get_new_objects(bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch)
         # All objects that can be resolved from before
-        existing_objects_detection, _, existing_objects_id = utils.get_existing_objects(detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, new_objects_id)
+        existing_objects_detection, existing_objects_bb, existing_objects_id = utils.get_existing_objects(detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, new_objects_id)
         assert set(existing_objects_id).union(set(new_objects_id)) == set(objects_id_in_pitch)
         
-        # Resolving step 
-        for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_object_detections, new_object_bb_info, new_objects_id):
-            # If it is cached, use cached option
-            if cache_resolving:
-                action = int(resolving_positions_cache[new_obj_id])
-            else:
-                action = resolver.resolve(pitch, match, new_objects_id, existing_objects_detection, existing_objects_id, frame_id)
-                if action is None or isinstance(action, list):  # if resolver wasn't able to resolve it by itself then fallback to manual resolution
-                    prompt = constants.prompt_input
-                    if action is not None:
-                        prompt += f"Missing ids are: {action}. Objets were not seen for: {utils.count_not_seen_players(match, action, frame_id)} frames"
+        # But if it is caching just try to get all ids from the cache
+        if cache_resolving:
+            for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_objects_detection, new_objects_bb, new_objects_id):
+                old_player_id = int(resolving_positions_cache[new_obj_id])
+                match.resolve_user_action(old_player_id, new_obj_id, detection_info_new_id, resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)
+        else:
+            # Ask resolver for the help
+            if len(new_objects_id):      
+                resolving_info: ai_resolver.ResolvingInfo = resolver.resolve(pitch, match, new_objects_detection, new_objects_bb, new_objects_id, existing_objects_detection, existing_objects_bb, existing_objects_id, frame_id)
+                # Resolve action for all resolved objects
+                for i in range(len(resolving_info.resolved_ids)):
+                    match.resolve_user_action(resolving_info.found_ids[i], resolving_info.resolved_ids[i], resolving_info.resolved_detections[i], resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)    
+                # Do manual resolvement for all unresolved objects
+                print(f"Starting manual resolvement in frame {frame_id}")
+                if len(resolving_info.unresolved_ids):
+                    print(f"Ids to resolve: {resolving_info.unresolved_ids}.")
+                    print(f"Missing players from the start: {resolving_info.unresolved_starting_ids}")
+                assert len(set(resolving_info.unresolved_starting_ids).intersection(set(existing_objects_id))) == 0
+                # Draw known objects in the 2D space
+                new_frame_det = pitch_img.copy()
+                for j in range(len(existing_objects_id)):
+                    _, existing_person_color, existing_id_to_show = match.get_info_for_drawing(existing_objects_id[j])
+                    view_.draw_person(new_frame_det, str(existing_id_to_show), existing_objects_detection[j], existing_person_color)
+                for i in range(len(resolving_info.unresolved_ids)):
+                    unresolved_id_str = str(resolving_info.unresolved_ids[i])
+                    print(f"Please resolve manually id {unresolved_id_str}")
                     new_frame_bb = video_frame.copy()
-                    new_frame_det = pitch_img.copy()
-                    # Draw known objects from frame before
-                    for i in range(len(existing_objects_id)):
-                        _, existing_person_color, existing_id_to_show = match.get_info_for_drawing(existing_objects_id[i])
-                        view_.draw_person(new_frame_det, str(existing_id_to_show), existing_objects_detection[i], existing_person_color)
-                    for i in range(len(new_objects_id)):
-                        view_.draw_person(new_frame_det, str(new_obj_id), detection_info_new_id, constants.BLACK)
-                    prompter.set_execution_config(prompt)
-                    view.View.box_label(new_frame_bb, bb_info_new_id, constants.BLACK, new_obj_id)
-                    view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, new_frame_det])
+                    manual_frame_det = new_frame_det.copy()
+                    # Draw unknown object in the 2D space
+                    view_.draw_person(manual_frame_det, unresolved_id_str, resolving_info.unresolved_detections[i], constants.BLACK)
+                    if i > 0:
+                        resolve_helper.storage.pop()
+                    resolve_helper.storage.append(manual_frame_det)
+                    # Draw unknown object in the real video
+                    view.View.box_label(new_frame_bb, resolving_info.unresolved_bbs[i], constants.BLACK, unresolved_id_str)
+                    prompter.set_execution_config(constants.prompt_input)
+                    view.View.show_img_while_not_killed([constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, manual_frame_det])
                     action = int(prompter.value)
-            match.resolve_user_action(action, new_obj_id, detection_info_new_id, resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)    
+                    match.resolve_user_action(action, resolving_info.unresolved_ids[i], resolving_info.unresolved_detections[i], resolving_positions_cache, resolving_info.unresolved_ids, existing_objects_id, resolve_helper, prompter)    
+                if len(resolving_info.unresolved_ids):
+                    resolve_helper.storage.pop()
+                print()
         
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
@@ -135,11 +153,14 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         elif k == ord('r'):
             # Show analytics
             analytics_display.show_player_run_table(match)
+        elif k == ord('t'):
+            analytics_display.show_match_sprint_stats(match)
         elif k == ord('q'):
             # Quit visualization
-            analytics_display.show_player_run_table(match)
             return True, resolving_positions_cache
         
+    analytics_display.show_player_run_table(match)
+    analytics_display.show_match_sprint_stats(match)
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False, resolving_positions_cache
     
@@ -155,9 +176,8 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     detections_vid_capture = cv.VideoCapture(path_to_video)
     
     # Create analytical display
-    num_frames = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_COUNT))
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
-    analytics_display = analytics_viewer.AnalyticsViewer(int(num_frames / fps_rate)) # sample every 1s
+    analytics_display = analytics_viewer.AnalyticsViewer(15) # sample every 1s
     
     # Create ai_resolver object
     resolver = ai_resolver.Resolver(fps_rate)
@@ -218,15 +238,15 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
-    while True: 
-        status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, resolving_positions_cache)
-        # Restart the video if you didn't get any input
-        if not cache_resolving and len(resolving_positions_cache) != 0:
-           with open(resolving_positions_cache_file, "w") as resolving_positions_file:
-                json.dump(resolving_positions_cache, resolving_positions_file, indent=2) 
-        detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
-        if status:
-            break
+    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, resolving_positions_cache)
+    # Restart the video if you didn't get any input
+    print(f"Cache resolving: {cache_resolving} {len(resolving_positions_cache)} {resolving_positions_cache} {resolving_positions_cache_file}")
+    if not cache_resolving and len(resolving_positions_cache) != 0:
+       with open(resolving_positions_cache_file, "w") as resolving_positions_file:
+            json.dump(resolving_positions_cache, resolving_positions_file, indent=2) 
+    # detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
+    # if status:
+          # break
     
     # Postprocess
     print("Finished playing the video")
