@@ -38,6 +38,11 @@ class Pitch:
 
     def __str__(self) -> str:
         return self.__repr__()
+
+    def normalize_pixel_position(self, pixel_coords: Tuple[float, float]):
+        if self.x_dim == PitchOrientation.LENGTH:
+            return (pixel_coords[0] - self.upper_left_corner[0]) / self.length, (pixel_coords[1] - self.upper_left_corner[1]) / self.width
+        return (pixel_coords[0] - self.upper_left_corner[0]) / self.width,(pixel_coords[1] - self.upper_left_corner[1]) / self.length
     
     def pixel_to_meters_positions(self, pixel_coords: Tuple[int, int]) -> Tuple[float, float]:
         """Computes object's position in real-world (meter) coordinates from pixel positions/

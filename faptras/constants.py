@@ -14,3 +14,7 @@ prompt_input = "Do you recognize object on the image? If new object shows anythi
 Otherwise, if player is shown on the image please enter its jersey number (previous tracking id) and if the image shows referee, enter 0. "  # currently the user will enter detection id
 MAX_SPEED = 11.5  # in m/s
 SPEED_AVG_NUM = 10
+MPLSOCCER_PITCH_LENGTH = 120
+MPLSOCCER_PITCH_WIDTH = 80
+FPS_ANIMATIONS = 25
+

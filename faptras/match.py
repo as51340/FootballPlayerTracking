@@ -15,8 +15,8 @@ class Match:
     """Represents the current state of the match.
     """
     def __init__(self, team1_name: str, team2_name: str) -> None:
-        self.team1 = Team(team1_name, constants.BLUE)
-        self.team2 = Team(team2_name, constants.RED)
+        self.team1 = Team(team1_name, constants.BLUE)  # team1 is left
+        self.team2 = Team(team2_name, constants.RED)  # team2 is red
         self.ignore_ids = []  # IDS that are ignored. They get added into this data structure from the user's side, e.g. assistant referee or any other object that user doesn't want to track anymore.
         self.initial_ids = set()  # initial ids in the match. Needed for automatic AI resolver.
        
@@ -64,7 +64,7 @@ class Match:
             return team1_player, self.team1.color, str(team1_player.label)
         elif team2_player is not None:
             return team2_player, self.team2.color, str(team2_player.label)
-    
+        
     def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
 

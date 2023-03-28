@@ -101,14 +101,14 @@ def calculate_speed_magnitude(vx: float, vy: float) -> float:
     return math.sqrt(vx**2 + vy**2)
 
 def get_sprint_category(v: float) -> SprintCategory:
-    if v < 1.9444:
+    if v < 1.9444:  # < 7km/h
         return SprintCategory.WALKING
-    elif v >= 1.9444 and v < 3.8889:
+    elif v >= 1.9444 and v < 3.8889:  # 7-14 km/h
         return SprintCategory.EASY
-    elif v >= 3.8889 and v < 5.2778:
+    elif v >= 3.8889 and v < 5.2778:  # 14-20km/h
         return SprintCategory.MODERATE
-    elif v >= 5.2778 and v < 6.9444:
-        return SprintCategory.FAST
+    elif v >= 5.2778 and v < 6.9444:  # 20-25 km/h
+        return SprintCategory.FAST  # > 25 km/h
     return SprintCategory.VERY_FAST
 
 def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
@@ -129,5 +129,4 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
             existing_objects_detections.append(detections_in_pitch[i])
             existing_objects_bb_info.append(bb_info_in_pitch[i])
             existing_objects_ids.append(object_ids_in_pitch[i])
-    return existing_objects_detections, existing_objects_bb_info, existing_objects_ids
-    
+    return existing_objects_detections, existing_objects_bb_info, existing_objects_ids 

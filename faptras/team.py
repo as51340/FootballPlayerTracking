@@ -23,5 +23,9 @@ class Team:
             if id in player.ids:
                 return player
         return None
+
+    def get_player_positions_from_frame(self, frame: int):
+        """Retrieves all players from the frame "frame". """
+        return [player.all_positions[frame] for player in self.players if frame in player.all_positions.keys()]
     
     

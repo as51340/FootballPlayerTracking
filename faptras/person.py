@@ -3,6 +3,7 @@ from collections import deque, defaultdict
 
 import utils
 import constants
+import pitch
 
 class Person:
     
@@ -16,31 +17,38 @@ class Person:
         """
         self.name = name
         self.ids: List[int] = [initial_id]
-        self.current_position: Tuple[float, float] = initial_position
+        self.current_position: Tuple[float, float] = initial_position  # in 2D space in pixels
         self.sum_pos_x, self.sum_pos_y = initial_position[0], initial_position[1]
         self.total_times_seen = 1
         self.total_run = 0  # How much player run estimated in meters
-        self.last_seen_frame_id = 0
+        self.last_seen_frame_id = 1
         self.speeds: Deque[float] = deque()  # needed just as cache
         self.sprint_categories: Dict[utils.SprintCategory, List[float]] = defaultdict(list)
         self.current_sprint_category = None
+         # stores all positions in absolute pixels but not every frame, it is sampled every N-th frame
+         # to calibrate for the camera imprecision
+        self.positions: Dict[int, Tuple[float, float]] = {1: initial_position} 
+        self.all_positions: Dict[int, Tuple[float, float]] = {1: initial_position} 
 
-    def update_total_run(self, new_position: Tuple[float, float]) -> None:
+    def update_total_run(self, pitch: pitch.Pitch, new_position: Tuple[float, float], current_frame: int) -> None:
         """Updates the amount that player run. The distance is calculated as Euclidean distance between last two person's positions.
         Current position and new position are in meters units.
         z = math.sqrt((x1-x2)**2 + (y1 - y2)**2)
 
         Args:
-            new_position (Tuple[float, float]): New person's position
+            new_position (Tuple[float, float]): New person's position in pixels.
         """
         # Distance update
-        distance_run = utils.calculate_euclidean_distance(self.current_position, new_position)
+        new_position_pixels = new_position
+        new_position = pitch.pixel_to_meters_positions(new_position)
+        current_position = pitch.pixel_to_meters_positions(self.current_position)
+        distance_run = utils.calculate_euclidean_distance(current_position, new_position)
         self.total_run += distance_run
         self.sum_pos_x += new_position[0]
         self.sum_pos_y += new_position[1]
         # Speed update
-        vx_local = new_position[0] - self.current_position[0]
-        vy_local = new_position[1] - self.current_position[1]
+        vx_local = new_position[0] - current_position[0]
+        vy_local = new_position[1] - current_position[1]
         v = utils.calculate_speed_magnitude(vx_local, vy_local)
         self.speeds.append(v)
         if len(self.speeds) == constants.SPEED_AVG_NUM:
@@ -59,7 +67,8 @@ class Person:
                 self.current_sprint_category = sprint_category
                 
         self.total_times_seen += 1
-        self.current_position = new_position
+        self.current_position = new_position_pixels
+        self.positions[current_frame] = new_position_pixels
     
     @property
     def label(self) -> str:

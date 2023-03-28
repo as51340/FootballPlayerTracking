@@ -19,13 +19,8 @@ else:
 
 i = 0
 while vid_capture.isOpened():
-    # vid_capture.read() methods returns a tuple, first element is a bool
-    # and the second is frame
     ret, frame = vid_capture.read()
     if ret == True:
-        if i == 0:
-            cv2.imwrite(f"images/materials/t7_reference_img.jpg", frame)
-            break
         if i % 100 == 0:
             print(f"Frame: {i}")
         cv2.imwrite(

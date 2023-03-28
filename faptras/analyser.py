@@ -132,7 +132,8 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                 # If we are drawing the object, it means we can do analytics
                 if (frame_id + 1) % analytics_display.run_estimation_frames == 0:
-                    person.update_total_run(pitch.pixel_to_meters_positions(frame_detection_int))
+                    person.update_total_run(pitch, frame_detection, frame_id + 1)
+                person.all_positions[frame_id] = frame_detection
                 
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
@@ -150,11 +151,59 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         elif k == ord('p'):
             # Pause visualization
             utils.pause()
-        elif k == ord('r'):
+        elif k == ord('r'):  # total run table
             # Show analytics
             analytics_display.show_player_run_table(match)
-        elif k == ord('t'):
+        elif k == ord('t'):  # sprint table
             analytics_display.show_match_sprint_stats(match)
+        elif k == ord('h'):  # heat map for each player
+            print(f"Please enter played id: ")
+            try:
+                player_id = int(input())
+                cv.destroyAllWindows()
+                analytics_display.draw_player_heatmap(match, pitch, player_id)
+                time.sleep(2)
+                cv.namedWindow(constants.DETECTIONS_WINDOW)
+                view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+            except ValueError:
+                print(f"Wrong input, please restart your calculations...")
+                time.sleep(2)
+        elif k == ord('c'):  # convex hull for a team
+            print("Please enter team's name: ")
+            team_name = input()
+            team, left = None, True  # on which side is the team's goalkeeper
+            if team_name == match.team1.name:
+                team = match.team1
+            elif team_name == match.team2.name:
+                team = match.team2
+                left = False
+            else:
+                print(f"Unknown team, please start calculations again...")
+                time.sleep(2)
+            if team is not None:
+                cv.destroyAllWindows()
+                analytics_display.draw_convex_hull_for_players(pitch, team, frame_id, left)
+                time.sleep(2)
+                cv.namedWindow(constants.DETECTIONS_WINDOW)
+                view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+        elif k == ord('d'):  # delaunay tessellation
+            cv.destroyAllWindows()
+            analytics_display.draw_delaunay_tessellation(match, pitch, frame_id)
+            time.sleep(2)
+            cv.namedWindow(constants.DETECTIONS_WINDOW)
+            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+        elif k == ord('v'):  # voronoi diagrams
+            cv.destroyAllWindows()
+            analytics_display.draw_voronoi_diagrams(match, pitch, frame_id)
+            time.sleep(2)
+            cv.namedWindow(constants.DETECTIONS_WINDOW)
+            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+        elif k == ord('a'):  # animations
+            cv.destroyAllWindows()
+            analytics_display.visualize_animation(match, pitch, 5, frame_id)
+            time.sleep(2)
+            cv.namedWindow(constants.DETECTIONS_WINDOW)
+            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
         elif k == ord('q'):
             # Quit visualization
             return True, resolving_positions_cache
