@@ -23,7 +23,9 @@ import sanity_checker
 
 prompter = thread_prompter.ThreadWithReturnValue()
 
-def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, resolving_positions_cache: dict = None):
+def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, 
+                        analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, 
+                        fps_rate: int, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -32,6 +34,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         detections_storage (_type_): Information needed to run visualization obtained by squash_detections function.
         pitch_img (_type_): A reference to the 2D pitch image.
         detections_vid_capture (_type_): Reference to the original video.
+        fps_rate (int): FPS of the original video.
 
     Returns:
         status, resolving_cache: if status is True it means that visualization should be stopped. Resolving cache is dict. If None is given, cache will be filled and
@@ -200,7 +203,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
         elif k == ord('a'):  # animations
             cv.destroyAllWindows()
-            analytics_display.visualize_animation(match, pitch, 5, frame_id)
+            analytics_display.visualize_animation(match, pitch, min(5, int(frame_id / fps_rate)), frame_id)
             time.sleep(2)
             cv.namedWindow(constants.DETECTIONS_WINDOW)
             view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
@@ -226,7 +229,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     
     # Create analytical display
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
-    analytics_display = analytics_viewer.AnalyticsViewer(15) # sample every 1s
+    analytics_display = analytics_viewer.AnalyticsViewer(15) # sample every 15 frames
     
     # Create ai_resolver object
     resolver = ai_resolver.Resolver(fps_rate)
@@ -287,7 +290,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
-    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, resolving_positions_cache)
+    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, fps_rate, resolving_positions_cache)
     # Restart the video if you didn't get any input
     print(f"Cache resolving: {cache_resolving} {len(resolving_positions_cache)} {resolving_positions_cache} {resolving_positions_cache_file}")
     if not cache_resolving and len(resolving_positions_cache) != 0:

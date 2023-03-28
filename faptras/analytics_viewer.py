@@ -162,14 +162,13 @@ class AnalyticsViewer:
             team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions)
             team2_positions = match.team2.get_player_positions_from_frame(current_frame - frame)
             team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions)
-            print(f"Team1 positions: {team1_positions}")
-            print(f"Team2 positions: {team2_positions}")
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
             return home, away
 
-       # call the animator, animate so 25 frames per second
-        animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=25, blit=True)
+        # call the animator, animate so 25 frames per second
+        # must not remove anim
+        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=constants.FPS_ANIMATIONS, blit=True)
         plt.show() 
     
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
