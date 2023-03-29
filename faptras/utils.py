@@ -21,7 +21,7 @@ class SprintCategory(Enum):
     MODERATE = 3
     FAST = 4
     VERY_FAST = 5
-
+    
 
 def get_file_name(path: str) -> str:
     """Extracts file name from the path. E.g. for path /user/video/t7.mp4 returns t7
@@ -88,6 +88,9 @@ def pause():
 def to_tuple_int(coords: Tuple) -> Tuple[int, int]:
     return int(coords[0]), int(coords[1])
 
+def to_tuple_float(coords: Tuple) -> Tuple[float, float]:
+    return float(coords[0]), float(coords[1])
+
 def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
     unseen_frames = []
     for missing_id in missing_ids:
@@ -110,6 +113,9 @@ def get_sprint_category(v: float) -> SprintCategory:
     elif v >= 5.2778 and v < 6.9444:  # 20-25 km/h
         return SprintCategory.FAST  # > 25 km/h
     return SprintCategory.VERY_FAST
+
+def convert_frame_to_minutes(frame, fps_rate):
+    return frame / (fps_rate * 60.0)
 
 def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
     """This method returns information about all objects that don't need to be resolved and about which we already have some information.

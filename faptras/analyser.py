@@ -23,6 +23,11 @@ import sanity_checker
 
 prompter = thread_prompter.ThreadWithReturnValue()
 
+def restart_visualizations():
+    time.sleep(2)
+    cv.namedWindow(constants.DETECTIONS_WINDOW)
+    view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, 
                         analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, 
                         fps_rate: int, resolving_positions_cache: dict = None):
@@ -156,18 +161,21 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             utils.pause()
         elif k == ord('r'):  # total run table
             # Show analytics
-            analytics_display.show_player_run_table(match)
+            cv.destroyAllWindows()
+            analytics_display.show_player_total_run(match)
+            restart_visualizations()
         elif k == ord('t'):  # sprint table
-            analytics_display.show_match_sprint_stats(match)
+            cv.destroyAllWindows()
+            # analytics_display.show_match_sprint_stats(match, fps_rate)
+            analytics_display.show_player_sprint_summary(pitch, match, fps_rate, 7)
+            restart_visualizations()
         elif k == ord('h'):  # heat map for each player
             print(f"Please enter played id: ")
             try:
                 player_id = int(input())
                 cv.destroyAllWindows()
                 analytics_display.draw_player_heatmap(match, pitch, player_id)
-                time.sleep(2)
-                cv.namedWindow(constants.DETECTIONS_WINDOW)
-                view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+                restart_visualizations()
             except ValueError:
                 print(f"Wrong input, please restart your calculations...")
                 time.sleep(2)
@@ -186,27 +194,19 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             if team is not None:
                 cv.destroyAllWindows()
                 analytics_display.draw_convex_hull_for_players(pitch, team, frame_id, left)
-                time.sleep(2)
-                cv.namedWindow(constants.DETECTIONS_WINDOW)
-                view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+                restart_visualizations()
         elif k == ord('d'):  # delaunay tessellation
             cv.destroyAllWindows()
             analytics_display.draw_delaunay_tessellation(match, pitch, frame_id)
-            time.sleep(2)
-            cv.namedWindow(constants.DETECTIONS_WINDOW)
-            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+            restart_visualizations()
         elif k == ord('v'):  # voronoi diagrams
             cv.destroyAllWindows()
             analytics_display.draw_voronoi_diagrams(match, pitch, frame_id)
-            time.sleep(2)
-            cv.namedWindow(constants.DETECTIONS_WINDOW)
-            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+            restart_visualizations()
         elif k == ord('a'):  # animations
             cv.destroyAllWindows()
             analytics_display.visualize_animation(match, pitch, min(5, int(frame_id / fps_rate)), frame_id)
-            time.sleep(2)
-            cv.namedWindow(constants.DETECTIONS_WINDOW)
-            view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+            restart_visualizations()
         elif k == ord('q'):
             # Quit visualization
             return True, resolving_positions_cache

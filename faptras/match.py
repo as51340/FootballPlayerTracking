@@ -65,7 +65,7 @@ class Match:
         elif team2_player is not None:
             return team2_player, self.team2.color, str(team2_player.label)
         
-    def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], team: int, jersey_number: int, name: str):
+    def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], detection_info_meters: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
 
         Args:
@@ -78,11 +78,11 @@ class Match:
             bool: True if team matches one of the teams' names, False otherwise.
         """
         if team == 0:
-            self.team1.players.append(Player(name, jersey_number, id, detection_info))
+            self.team1.players.append(Player(name, jersey_number, id, detection_info, detection_info_meters))
         elif team == 1:
-            self.team2.players.append(Player(name, jersey_number, id, detection_info))
+            self.team2.players.append(Player(name, jersey_number, id, detection_info, detection_info_meters))
         elif team == 2:
-            self.referee = Referee(name, id, constants.YELLOW, detection_info)
+            self.referee = Referee(name, id, constants.YELLOW, detection_info, detection_info_meters)
 
         if team < 3:  # team1, team2 or referee
             self.initial_ids.add(id)
@@ -186,10 +186,11 @@ class Match:
 
         match = Match(team1_name, team2_name)
         for obj_id, (line, initial_position) in players_data.items():
+            initial_position = utils.to_tuple_float(initial_position)
             values = list(map(lambda val: val.strip().rstrip(), line.split(',')))
             team = int(values[0])
             jersey_number = int(values[1])
-            if not match.resolve_team_helper(obj_id, pitch.pixel_to_meters_positions(utils.to_tuple_int(initial_position)), team, jersey_number, values[2]):
+            if not match.resolve_team_helper(obj_id, initial_position, pitch.pixel_to_meters_positions(initial_position), team, jersey_number, values[2]):
                 return None
         return match
     
@@ -228,7 +229,7 @@ class Match:
                 team = int(values[0])
                 jersey_number = int(values[1])
                 try:
-                    if not match.resolve_team_helper(obj_ids[i], pitch.pixel_to_meters_positions(detections_info[i]), team, jersey_number, values[2]):
+                    if not match.resolve_team_helper(obj_ids[i], detections_info[i], pitch.pixel_to_meters_positions(detections_info[i]), team, jersey_number, values[2]):
                         print("Unknown team, please insert again...")
                     else:
                         player_cache[obj_ids[i]] = value, detections_info[i]
