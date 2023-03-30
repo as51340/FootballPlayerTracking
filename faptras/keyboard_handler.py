@@ -38,9 +38,9 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     elif k == ord('p'):
         utils.pause() # Pause visualization
     elif k == ord('r'):  # total run
-        forward_analytics_call(analytics_display.show_match_total_run, pitch, match, fps_rate, 7)
+        forward_analytics_call(analytics_display.show_match_total_run, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('t'):  # sprints
-        forward_analytics_call(analytics_display.show_match_sprint_summary, pitch, match, fps_rate, 7)
+        forward_analytics_call(analytics_display.show_match_sprint_summary, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('h'):  # heat map for each player
         print(f"Please enter player id: ")
         try:
@@ -67,7 +67,7 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     elif k == ord('v'):  # voronoi diagrams
         forward_analytics_call(analytics_display.draw_voronoi_diagrams, match, pitch, frame_id)
     elif k == ord('a'):  # animations
-        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), frame_id)
+        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), frame_id, 3)
     return False
 
     

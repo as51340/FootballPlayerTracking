@@ -211,7 +211,7 @@ class AnalyticsViewer:
         pitch_color='#22312b', line_color='#efefef', pitch_length=105, pitch_width=68)
         draw_pitch.draw(ax=axs[0], tight_layout=False, constrained_layout=True, figsize=(8, 5))
         # Get positions
-        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, player.all_positions)
+        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, player.all_positions.values())
         # Start drawing heatmap
         bin_statistic = draw_pitch.bin_statistic(x_positions, y_positions, statistic='count', bins=(25, 25))
         bin_statistic['statistic'] = gaussian_filter(bin_statistic['statistic'], 1)
@@ -261,7 +261,7 @@ class AnalyticsViewer:
         pitch.scatter(x_positions, y_positions, ax=ax, edgecolor='black', facecolor='cornflowerblue')
         plt.show()
     
-    def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, current_frame: int):
+    def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, current_frame: int, window: int):
         """Visualizes last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
         # Drawing setup
         draw_pitch = mplsoccer.pitch.Pitch()
@@ -278,10 +278,13 @@ class AnalyticsViewer:
         
         def animate(frame):
             """Function used for animation. Sets data position for players."""
+            # Get team1 positions
             team1_positions = match.team1.get_player_positions_from_frame(current_frame - frame)
             team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions)
+            # Get team2 positions
             team2_positions = match.team2.get_player_positions_from_frame(current_frame - frame)
             team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions)
+            # Set home and away data
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
             return home, away
