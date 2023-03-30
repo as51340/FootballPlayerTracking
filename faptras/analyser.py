@@ -20,13 +20,9 @@ import thread_prompter
 import resolve_helpers as resolve_helpers
 import ai_resolver
 import sanity_checker
+import keyboard_handler
 
 prompter = thread_prompter.ThreadWithReturnValue()
-
-def restart_visualizations():
-    time.sleep(2)
-    cv.namedWindow(constants.DETECTIONS_WINDOW)
-    view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
 
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, 
                         analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, 
@@ -130,18 +126,13 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             person.last_seen_frame_id = frame_id
 
             # Validation step
-            if id_to_show in showing_ids:
-                print(f"Id {id_to_show} already drawn")
+            assert id_to_show not in showing_ids
             showing_ids.add(id_to_show)
             
             if objects_id_in_pitch[i] not in match.ignore_ids:
-                frame_detection_int = utils.to_tuple_int(frame_detection)
-                view_.draw_person(frame_img_det, id_to_show, frame_detection_int, person_color)
+                view_.draw_person(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
-                # If we are drawing the object, it means we can do analytics
-                if (frame_id + 1) % analytics_display.run_estimation_frames == 0:
-                    person.update_total_run(pitch, frame_detection, frame_id + 1)
-                person.all_positions[frame_id] = frame_detection
+                person.update_person_position(frame_detection, pitch.pixel_to_meters_positions(frame_detection), frame_id)
                 
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
@@ -149,72 +140,9 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         cv.imshow(constants.VIDEO_WINDOW, video_frame)
         
         # Handle key-press
-        utils.check_kill(k)
-        if k == ord('f'):
-            # Switch between normal and full mode
-            view_.switch_screen_mode()
-        elif k == ord('s'):
-            # Switch drawing mode between circles and ids
-            view_.switch_draw_mode()
-        elif k == ord('p'):
-            # Pause visualization
-            utils.pause()
-        elif k == ord('r'):  # total run table
-            # Show analytics
-            cv.destroyAllWindows()
-            analytics_display.show_match_total_run(pitch, match, fps_rate, 7)
-            restart_visualizations()
-        elif k == ord('t'):  # sprint table
-            cv.destroyAllWindows()
-            # analytics_display.show_match_sprint_stats(match, fps_rate)
-            analytics_display.show_match_sprint_summary(pitch, match, fps_rate, 7)
-            restart_visualizations()
-        elif k == ord('h'):  # heat map for each player
-            print(f"Please enter played id: ")
-            try:
-                player_id = int(input())
-                cv.destroyAllWindows()
-                analytics_display.draw_player_heatmap(match, pitch, player_id)
-                restart_visualizations()
-            except ValueError:
-                print(f"Wrong input, please restart your calculations...")
-                time.sleep(2)
-        elif k == ord('c'):  # convex hull for a team
-            print("Please enter team's name: ")
-            team_name = input()
-            team, left = None, True  # on which side is the team's goalkeeper
-            if team_name == match.team1.name:
-                team = match.team1
-            elif team_name == match.team2.name:
-                team = match.team2
-                left = False
-            else:
-                print(f"Unknown team, please start calculations again...")
-                time.sleep(2)
-            if team is not None:
-                cv.destroyAllWindows()
-                analytics_display.draw_convex_hull_for_players(pitch, team, frame_id, left)
-                restart_visualizations()
-        elif k == ord('d'):  # delaunay tessellation
-            cv.destroyAllWindows()
-            analytics_display.draw_delaunay_tessellation(match, pitch, frame_id)
-            restart_visualizations()
-        elif k == ord('v'):  # voronoi diagrams
-            cv.destroyAllWindows()
-            analytics_display.draw_voronoi_diagrams(match, pitch, frame_id)
-            restart_visualizations()
-        elif k == ord('a'):  # animations
-            cv.destroyAllWindows()
-            analytics_display.visualize_animation(match, pitch, min(5, int(frame_id / fps_rate)), frame_id)
-            restart_visualizations()
-        elif k == ord('q'):
-            # Quit visualization
+        if keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id):
             return True, resolving_positions_cache
-    
-    cv.destroyAllWindows()
-    analytics_display.show_match_total_run(pitch, match, fps_rate, 7)
-    analytics_display.show_match_sprint_summary(pitch, match, fps_rate, 7)
-    restart_visualizations()
+   
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False, resolving_positions_cache
     
@@ -231,7 +159,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     
     # Create analytical display
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
-    analytics_display = analytics_viewer.AnalyticsViewer(15) # sample every 15 frames
+    analytics_display = analytics_viewer.AnalyticsViewer()
     
     # Create ai_resolver object
     resolver = ai_resolver.Resolver(fps_rate)

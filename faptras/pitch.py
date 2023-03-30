@@ -40,6 +40,14 @@ class Pitch:
         return self.__repr__()
 
     def normalize_pixel_position(self, pixel_coords: Tuple[float, float]):
+        """Normalizes pixel position to [0, 1] by taking into the account margins from pitch to the edge of the image.
+
+        Args:
+            pixel_coords (Tuple[float, float]): Coordinates in pixel space.
+
+        Returns:
+            Normalized coordinates
+        """
         if self.x_dim == PitchOrientation.LENGTH:
             return (pixel_coords[0] - self.upper_left_corner[0]) / self.length, (pixel_coords[1] - self.upper_left_corner[1]) / self.width
         return (pixel_coords[0] - self.upper_left_corner[0]) / self.width,(pixel_coords[1] - self.upper_left_corner[1]) / self.length
@@ -79,28 +87,6 @@ class Pitch:
                 if pitch_data[0] == pitch_name:
                     return Pitch(pitch_path, *(map(lambda tup_str: literal_eval(tup_str), pitch_data[1:])), pitch_length, pitch_width)
         return None
-    
-    def get_team_by_position(self, frame_detection: Tuple[int, int]) -> int:
-        """Returns initial team by the coord of the player. Returns 1 for the first part of the pitch and 2 for the second part of the pitch. When the pitch has horizontal layoff, the first part
-        is the left part and when the pitch has the horizontal layoff, the first part is considered the upper part of the pitch. Returns 2 for uncertain players near the centre.
-
-        Args:
-            frame_detection: Tuple[int, int]
-        """
-        if self.x_dim == PitchOrientation.LENGTH:
-            if frame_detection[0] < self.upper_left_corner[0] + self.length / 2 - 10:
-                return 1  # certain that is the first team
-            elif frame_detection[0] > self.upper_left_corner[0] + self.length / 2 + 10:
-                return 2
-            else:
-                return 0  # second team
-        else:  # width orientation
-            if frame_detection[1] < self.upper_left_corner[1] + self.width / 2 - 10:
-                return 1  # certain that is the first team
-            elif frame_detection[1] > self.upper_left_corner[1] + self.width / 2 + 10:
-                return 2
-            else:
-                return 0  # second team            
     
     def is_detection_outside(self, detection_x_coord: int, detection_y_coord: int) -> bool:
         """Checks whether the detection is outside of the pitch.

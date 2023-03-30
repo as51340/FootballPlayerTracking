@@ -22,9 +22,6 @@ import constants
 
 class AnalyticsViewer:
     
-    def __init__(self, run_estimation_frames: int) -> None:
-        self.run_estimation_frames = run_estimation_frames
-    
     def estimate_player_speed(self, pitch: pitch.Pitch, player: person.Player, video_fps_rate: int, window: int) -> np.array:
         """Estimates player speed through the match by using moving average window algorithm.
 
@@ -76,7 +73,6 @@ class AnalyticsViewer:
         player_distances = list(map(lambda dist: round(dist, 1), player_distances))
         return team_total_run, player_ids, player_distances
             
-    
     def show_match_total_run(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
         """Shows total run statistic for the whole match. Estimates how much each player run throughout the recording with the moving average window.
 
@@ -115,7 +111,6 @@ class AnalyticsViewer:
         axs[1].bar_label(team2_plot)
         plt.show()    
     
-    
     def draw_player_velocities(self, i: int, j: int, axs, minutes: np.array, velocities: np.array, player: person.Player):
         """Draws plot on a given axs determined with i and j indexes. Minutes presents times at which the sampling was done.
 
@@ -149,7 +144,6 @@ class AnalyticsViewer:
            sprint_categories_plot.bar_label(container=container)
         plt.show()
 
-    
     def draw_team_sprint_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
         """Shows summmary for all players in one team.
 
@@ -214,7 +208,7 @@ class AnalyticsViewer:
         pitch_color='#22312b', line_color='#efefef', pitch_length=105, pitch_width=68)
         draw_pitch.draw(ax=axs[0], tight_layout=False, constrained_layout=True, figsize=(8, 5))
         # Get positions
-        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, player.positions.values())
+        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, player.all_positions)
         # Start drawing heatmap
         bin_statistic = draw_pitch.bin_statistic(x_positions, y_positions, statistic='count', bins=(25, 25))
         bin_statistic['statistic'] = gaussian_filter(bin_statistic['statistic'], 1)

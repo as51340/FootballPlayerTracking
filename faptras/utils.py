@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import os
 import time
 import sys
@@ -11,17 +11,18 @@ import cv2 as cv
 
 import globals
 
+
 @total_ordering
 class SprintCategory(Enum):
     def __le__(self, b):
         return self.value <= b.value
-    
+
     WALKING = 1
     EASY = 2
     MODERATE = 3
     FAST = 4
     VERY_FAST = 5
-    
+
 
 def get_file_name(path: str) -> str:
     """Extracts file name from the path. E.g. for path /user/video/t7.mp4 returns t7
@@ -46,7 +47,8 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
     storage = dict()
     last_frame_id = sys.maxsize
     detections, objects, bb_info = [], [], []
-    scaler_homo_func = lambda row: [int(row[0] / row[2]), int(row[1] / row[2])]
+    def scaler_homo_func(row): return [int(
+        row[0] / row[2]), int(row[1] / row[2])]
     with open(path_to_detections, "r") as d_file:
         lines = d_file.readlines()
         for line in lines:
@@ -61,22 +63,26 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
             # Calculate lower center
             if frame_id > last_frame_id:
                 detections = np.array(detections)@H.T
-                detections = np.apply_along_axis(scaler_homo_func, 1, detections)
+                detections = np.apply_along_axis(
+                    scaler_homo_func, 1, detections)
                 assert detections.shape[0] == len(objects) == len(bb_info)
                 storage[last_frame_id] = (detections, bb_info, objects)
                 detections, objects, bb_info = [], [], []
             # For every frame do
-            detections.append([bb_left + 0.5 * bb_width, bb_top + bb_height, 1])
+            detections.append(
+                [bb_left + 0.5 * bb_width, bb_top + bb_height, 1])
             objects.append(object_id)
-            bb_info.append([int(bb_left), int(bb_top), int(bb_width), int(bb_height)])
+            bb_info.append([int(bb_left), int(bb_top),
+                           int(bb_width), int(bb_height)])
             last_frame_id = frame_id
-        print(f"Reading: {frame_id} frames took: {(time.time() - start_time):.2f}s")
+        print(
+            f"Reading: {frame_id} frames took: {(time.time() - start_time):.2f}s")
         return storage
 
 def check_kill(k):
     if k == ord('k'):
         os._exit(-1)
-        
+
 def pause():
     while True:
         time.sleep(0.5)
@@ -94,25 +100,12 @@ def to_tuple_float(coords: Tuple) -> Tuple[float, float]:
 def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
     unseen_frames = []
     for missing_id in missing_ids:
-        unseen_frames.append(frame_id - match_.find_person_with_id(missing_id).last_seen_frame_id)
-    return unseen_frames        
+        unseen_frames.append(
+            frame_id - match_.find_person_with_id(missing_id).last_seen_frame_id)
+    return unseen_frames
 
 def calculate_euclidean_distance(current_position: Tuple[float, float], new_position: Tuple[float, float]):
     return math.sqrt((current_position[0] - new_position[0])**2 + (current_position[1] - new_position[1])**2)
-
-def calculate_speed_magnitude(vx: float, vy: float) -> float:
-    return math.sqrt(vx**2 + vy**2)
-
-def get_sprint_category(v: float) -> SprintCategory:
-    if v < 1.9444:  # < 7km/h
-        return SprintCategory.WALKING
-    elif v >= 1.9444 and v < 3.8889:  # 7-14 km/h
-        return SprintCategory.EASY
-    elif v >= 3.8889 and v < 5.2778:  # 14-20km/h
-        return SprintCategory.MODERATE
-    elif v >= 5.2778 and v < 6.9444:  # 20-25 km/h
-        return SprintCategory.FAST  # > 25 km/h
-    return SprintCategory.VERY_FAST
 
 def convert_frame_to_minutes(frame, fps_rate):
     return frame / (fps_rate * 60.0)
@@ -135,4 +128,4 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
             existing_objects_detections.append(detections_in_pitch[i])
             existing_objects_bb_info.append(bb_info_in_pitch[i])
             existing_objects_ids.append(object_ids_in_pitch[i])
-    return existing_objects_detections, existing_objects_bb_info, existing_objects_ids 
+    return existing_objects_detections, existing_objects_bb_info, existing_objects_ids
