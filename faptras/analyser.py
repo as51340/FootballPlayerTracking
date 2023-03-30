@@ -162,12 +162,12 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         elif k == ord('r'):  # total run table
             # Show analytics
             cv.destroyAllWindows()
-            analytics_display.show_player_total_run(match)
+            analytics_display.show_match_total_run(pitch, match, fps_rate, 7)
             restart_visualizations()
         elif k == ord('t'):  # sprint table
             cv.destroyAllWindows()
             # analytics_display.show_match_sprint_stats(match, fps_rate)
-            analytics_display.show_player_sprint_summary(pitch, match, fps_rate, 7)
+            analytics_display.show_match_sprint_summary(pitch, match, fps_rate, 7)
             restart_visualizations()
         elif k == ord('h'):  # heat map for each player
             print(f"Please enter played id: ")
@@ -210,9 +210,11 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         elif k == ord('q'):
             # Quit visualization
             return True, resolving_positions_cache
-        
-    analytics_display.show_player_run_table(match)
-    analytics_display.show_match_sprint_stats(match)
+    
+    cv.destroyAllWindows()
+    analytics_display.show_match_total_run(pitch, match, fps_rate, 7)
+    analytics_display.show_match_sprint_summary(pitch, match, fps_rate, 7)
+    restart_visualizations()
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False, resolving_positions_cache
     

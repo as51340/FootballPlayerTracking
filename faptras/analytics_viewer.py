@@ -24,55 +24,95 @@ class AnalyticsViewer:
     
     def __init__(self, run_estimation_frames: int) -> None:
         self.run_estimation_frames = run_estimation_frames
- 
-    def show_player_total_run(self, match: match.Match):
-        """Simple printing visualizer for running estimation.
+    
+    def estimate_player_speed(self, pitch: pitch.Pitch, player: person.Player, video_fps_rate: int, window: int) -> np.array:
+        """Estimates player speed through the match by using moving average window algorithm.
 
         Args:
-            match (match.Match): Reference to the match
+            pitch (pitch.Pitch): A reference to the pitch.
+            player (person.Player): A reference to the player.
+            video_fps_rate (int): FPS rate of the original video.
+            window (int): Size of the window used for estimation.
+
+        Returns:
+            np.array: Velocities throughout the match.
         """
-        # First print everything in the table
-        print(f"Referee: {match.referee.ids[0]} {match.referee.total_run:.2f}m\n")
-        print(f"Team: {match.team1.name}")
-        team1_total_run, team2_total_run = 0, 0
-        team1_players_id, team1_players_total_run = [], []
-        for player in match.team1.players:
-            print(f"Player: {player.ids[0]} {player.total_run:.2f}m")
-            team1_total_run += player.total_run
-            team1_players_id.append(player.name)
-            team1_players_total_run.append(player.total_run)
-        print(f"Team {match.team1.name} ran in total {team1_total_run:.2f}m and on average {(team1_total_run / len(match.team1.players)):.2f}m\n")
-        print(f"Team: {match.team2.name}")
-        team2_players_id, team2_players_total_run = [], []
-        for player in match.team2.players:
-            print(f"Player: {player.ids[0]} {player.total_run:.2f}m")
-            team2_total_run += player.total_run
-            team2_players_id.append(player.name)
-            team2_players_total_run.append(player.total_run)
-        print(f"Team {match.team2.name} ran in total {team2_total_run:.2f}m and on average {(team2_total_run / len(match.team2.players)):.2f}m\n")
-        # Then, visualize everything
-        # Draw a plot comparing two teams
+        ma_window = np.ones(window) / window   # moving average windows
+        dt = 1 / video_fps_rate  # sampling rate
+        player_meters_positions = list(map(lambda position: pitch.pixel_to_meters_positions(position), player.all_positions.values()))
+        player_x_positions = np.array(list(map(lambda position: position[0], player_meters_positions)))
+        player_y_positions = np.array(list(map(lambda position: position[1], player_meters_positions)))
+        x_diff = np.diff(player_x_positions)
+        y_diff = np.diff(player_y_positions)
+        vx = x_diff / dt
+        vy = y_diff / dt
+        vx = np.convolve(vx, ma_window, mode="same")
+        vy = np.convolve(vy, ma_window, mode="same")
+        return np.sqrt(vx**2 + vy**2)
+        
+    def estimate_team_total_run(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int) -> Tuple[float, List[str], List[float]]:
+        """Estimates how much players of one team ran throughout the match.
+
+        Args:
+            pitch (pitch.Pitch): A reference to the pitch.
+            team (team.Team): A reference to the team.
+            video_fps_rate (int): FPS rate of the original video.
+            window (int): Size of the window used for estimation.
+
+        Returns:
+            Tuple[float, List[str], List[float]]: Team total run, player identificators and player distances
+        """
+        team_total_run = 0
+        player_ids, player_distances = [], []
+        # iterate over all players
+        for player in team.players:
+            # Get player positions
+            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            player_total_distance = v.sum() / video_fps_rate
+            team_total_run += player_total_distance
+            player_ids.append(player.name)
+            player_distances.append(player_total_distance)
+        team_total_run = round(team_total_run, 1)
+        player_distances = list(map(lambda dist: round(dist, 1), player_distances))
+        return team_total_run, player_ids, player_distances
+            
+    
+    def show_match_total_run(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
+        """Shows total run statistic for the whole match. Estimates how much each player run throughout the recording with the moving average window.
+
+        Args:
+            pitch (pitch.Pitch): A reference to the pitch.
+            match (match.Match): A reference to the match.
+            video_fps_rate (int): FPS rate of the original video.
+            window (int): Size of the window used for estimation.
+        """
+        # Get team data
+        team1_total_run, team1_players_id, team1_players_total_run = self.estimate_team_total_run(pitch, match.team1, video_fps_rate, window)
+        team2_total_run, team2_players_id, team2_players_total_run = self.estimate_team_total_run(pitch, match.team2, video_fps_rate, window)
         team_data = [team1_total_run, team2_total_run]
         labels = [match.team1.name, match.team2.name]
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.bar(labels, team_data, width=0.75, align="center")
+        _, ax = plt.subplots(figsize=(8, 6))
+        team_plot = ax.bar(labels, team_data, width=0.75, align="center")
         ax.set_ylabel("Total run in meters")
         ax.set_title("Team total run comparison")
-        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 10), sharey=True)
+        ax.bar_label(team_plot)
+        _, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 10), sharey=True)
         # Draw a plot for teams
         team1_ind = np.arange(len(team1_players_id))
-        axs[0].bar(team1_ind, team1_players_total_run)
+        team1_plot = axs[0].bar(team1_ind, team1_players_total_run)
         axs[0].set_ylabel("Total run in meters")
         axs[0].set_title(f"Team {match.team1.name} total run")
         axs[0].set_xticks(team1_ind)
         axs[0].set_xticklabels(team1_players_id, rotation=65)
-        # Second team setup
+        axs[0].bar_label(team1_plot)
+        # Second team plot
         team2_ind = np.arange(len(team1_players_id))
-        axs[1].bar(team2_players_id, team2_players_total_run)
+        team2_plot = axs[1].bar(team2_players_id, team2_players_total_run)
         axs[1].set_ylabel("Total run in meters")
         axs[1].set_title(f"Team {match.team2.name} total run")
         axs[1].set_xticks(team2_ind)
         axs[1].set_xticklabels(team2_players_id, rotation=65)
+        axs[1].bar_label(team2_plot)
         plt.show()    
     
     
@@ -91,20 +131,30 @@ class AnalyticsViewer:
         axs[i][j].set_xlabel("Minutes")
         axs[i][j].set_ylabel("Speed (m/s)")
     
-    def draw_team_sprint_categories(self, player_ids: List, team_sprint_categories, ax):
+    def draw_team_sprint_categories(self, player_ids: List, team_sprint_categories: pd.DataFrame, ax):
+        """Draws sprint categories bar plot for a team.
+
+        Args:
+            player_ids (List): Player identificators.
+            team_sprint_categories (pd.DataFrame): Sprint categories saved as a data frame.
+            ax
+        """
         x_axis = np.arange(len(player_ids))
-        team_sprint_categories.plot.bar(ax=ax)
+        sprint_categories_plot = team_sprint_categories.plot.bar(ax=ax)
         ax.set_xticks(x_axis)
         ax.set_xticklabels(x_axis, rotation=65)
         ax.set_ylabel("Distance (m)")
         ax.legend()
+        for container in sprint_categories_plot.containers:
+           sprint_categories_plot.bar_label(container=container)
         plt.show()
 
     
-    def show_team_sprint_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
+    def draw_team_sprint_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
         """Shows summmary for all players in one team.
 
         Args:
+            pitch (pitch.Pitch): A reference to the pitch.
             team (team.Team): A reference to the team.
             video_fps_rate (int): Original video fps rate.
             window (int): Smoothing window size.
@@ -117,10 +167,7 @@ class AnalyticsViewer:
         fig_sprint_category, ax_sprint_category = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
         fig_sprint_category.suptitle(f"Team {team.name} sprint categories", color="black", fontsize=30)
         # Calculation parameters
-        dt = 1 / video_fps_rate  # sampling rate
-        ma_window = np.ones(window) / window   # moving average windows
         # Sprint categories
-        team_sprint_categories_cnt = {}  # needs revisement
         team_sprint_categories_dist = defaultdict(list)  # in meters
         player_ids = []
         for ind, player in enumerate(team.players):
@@ -128,81 +175,33 @@ class AnalyticsViewer:
             i = ind // 4
             j = ind % 4
             # Speed calculation
-            player_meters_positions = list(map(lambda position: pitch.pixel_to_meters_positions(position), player.all_positions.values()))
-            player_x_positions = np.array(list(map(lambda position: position[0], player_meters_positions)))
-            player_y_positions = np.array(list(map(lambda position: position[1], player_meters_positions)))
-            x_diff = np.diff(player_x_positions)
-            y_diff = np.diff(player_y_positions)
-            vx = x_diff / dt
-            vy = y_diff / dt
-            vx = np.convolve(vx, ma_window, mode="same")
-            vy = np.convolve(vy, ma_window, mode="same")
-            v = np.sqrt(vx**2 + vy**2)
+            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
             v[v > constants.MAX_SPEED] = np.nan  # discard wrong measurements
             # Now we will split velocities in categories and calculate distance covered in each sprint category
-            team_sprint_categories_dist[utils.SprintCategory.WALKING].append(v[v <= constants.WALKING_MAX_SPEED].sum() * dt)
-            team_sprint_categories_dist[utils.SprintCategory.EASY].append(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() * dt)
-            team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() * dt)
-            team_sprint_categories_dist[utils.SprintCategory.FAST].append(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() * dt)
-            team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(v[v > constants.FAST_MAX_SPEED].sum() * dt)
+            team_sprint_categories_dist[utils.SprintCategory.WALKING].append(round(v[v <= constants.WALKING_MAX_SPEED].sum() / video_fps_rate, 1))
+            team_sprint_categories_dist[utils.SprintCategory.EASY].append(round(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(round(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_dist[utils.SprintCategory.FAST].append(round(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(round(v[v > constants.FAST_MAX_SPEED].sum() / video_fps_rate, 1))
             player_ids.append(player.name)
             # Calculate minutes
             minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
             self.draw_player_velocities(i, j, axs_velocites, minutes, v, player)
         self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category)
     
-    def show_player_sprint_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
-        """Calculates speed of each player through the match. Takes into account fps rate of the original video and sampling period.
+    def show_match_sprint_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
+        """Calculates speed of each player through the match. Takes into account fps rate of the original video and sampling period = windpw/
 
         Args:
+            pitch (pitch.Pitch): A reference to the pitch.
             match (match.Match): A reference to the match.
             video_fps_rate (int): Original video fps rate.
             window (int): Smoothing window size.
         """
-        self.show_team_sprint_summary(pitch, match.team1, video_fps_rate, window)
-        self.show_team_sprint_summary(pitch, match.team2, video_fps_rate, window)
+        self.draw_team_sprint_summary(pitch, match.team1, video_fps_rate, window)
+        self.draw_team_sprint_summary(pitch, match.team2, video_fps_rate, window)
         plt.show()
-        
     
-    def show_player_sprint_stats(self, person: person.Person, team_stats: Dict[utils.SprintCategory, List[float]]):
-        if len((person.sprint_categories.keys())):
-            print(f"Person: {person.ids[0]}") 
-        for sprint_category, sprint_distances in person.sprint_categories.items():
-            num_sprints = len(sprint_distances)
-            sum_sprints = sum(sprint_distances)
-            avg_sprint_distance = sum_sprints / num_sprints
-            print(f"{sprint_category}: Number of sprints: {num_sprints} Avg. sprint distance: {avg_sprint_distance:.2f}m")
-            team_stats[sprint_category][0] += num_sprints
-            team_stats[sprint_category][1] += avg_sprint_distance 
-                
-    def show_match_sprint_stats(self, match: match.Match, video_fps_rate: int):
-        """Simple printing visualizer for estimating number and category of sprints.
-
-        Args:
-            match (match.Match): _description_
-            video_fps_rate (int): FPS rate with which the original video was recorded.
-        """
-        print(f"Referee: {match.referee.name}")
-        self.show_player_sprint_stats(match.referee, defaultdict(lambda: [0, 0]))
-        print(f"Team: {match.team1.name}")
-        team1_stats = defaultdict(lambda: [0, 0])
-        for player in match.team1.players:
-            self.show_player_sprint_stats(player, team1_stats)
-        if len(team1_stats.keys()):
-            print(f"Team {match.team1.name} stats")
-        for sprint_category, (num_sprints, avg_sprint_distance) in team1_stats.items():
-            print(f"{sprint_category}: Number of sprints: {(num_sprints / len(match.team1.players)):.2f} Avg. sprint distance: {(avg_sprint_distance / len(match.team1.players)):.2f}m")
-               
-        print(f"Team: {match.team2.name}")
-        team2_stats = defaultdict(lambda: [0, 0])
-        for player in match.team2.players:
-            self.show_player_sprint_stats(player, team2_stats)
-        if len(team2_stats.keys()):
-            print(f"Team {match.team2.name} stats")
-        for sprint_category, (num_sprints, avg_sprint_distance) in team2_stats.items():
-            print(f"{sprint_category}: Number of sprints: {(num_sprints / len(match.team2.players)):.2f} Avg. sprint distance: {(avg_sprint_distance / len(match.team2.players)):.2f}m")
-        print()
-        
     def draw_player_heatmap(self, match: match.Match, pitch: pitch.Pitch, player_id: int):
         """Draws heatmap for the given player."""
         player = match.find_person_with_id(player_id)
@@ -242,7 +241,7 @@ class AnalyticsViewer:
         plt.show()
     
     def draw_convex_hull_for_players(self, pitch: pitch.Pitch, team: team.Team, current_frame: int, left: bool):
-        """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper will be ignored.
+        """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper is ignored.
         Left represents the side on which is the goalkeeper.
         """
         # Extract positons
@@ -266,8 +265,7 @@ class AnalyticsViewer:
         plt.show()
     
     def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, current_frame: int):
-        """Visualizes last N frames"""
-        # TODO: needs changing because of positions
+        """Visualizes last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
         # Drawing setup
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
@@ -292,7 +290,7 @@ class AnalyticsViewer:
             return home, away
 
         # call the animator, animate so 25 frames per second
-        # must not remove anim
+        # must not remove anim!
         anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=constants.FPS_ANIMATIONS, blit=True)
         plt.show() 
     
@@ -316,29 +314,13 @@ class AnalyticsViewer:
         draw_pitch.scatter(team1_x_positions, team1_y_positions, c='yellow', s=80, ec='k', ax=ax)
         draw_pitch.scatter(team2_x_positions, team2_y_positions, c='red', s=80, ec='k', ax=ax)
         plt.show()
-        
-        
-    def get_team_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
-        """Helper method to extract team positions and transform them into the mplsoccer friendly format."""
-        team_positions: Tuple[float, float] = list(map(lambda position: pitch.normalize_pixel_position(position), team_positions))
-        team_x_positions = list(map(lambda position: position[0] * constants.MPLSOCCER_PITCH_LENGTH, team_positions))
-        team_y_positions = list(map(lambda position: position[1] * constants.MPLSOCCER_PITCH_WIDTH, team_positions))
-        return team_x_positions, team_y_positions
-    
-    def draw_positions_tessellation(self, draw_pitch, pitch: pitch.Pitch, team_positions, color, ax):
-        """Helper method for tessellation."""
-        draw_pitch.draw(figsize=(8, 6), ax=ax)
-        team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(pitch, team_positions)
-        draw_pitch.triplot(team_x_positions, team_y_positions, color=color, linewidth=2, ax=ax)
-        draw_pitch.scatter(team_x_positions, team_y_positions, color=color, s=150, zorder=10, ax=ax)
-    
+                
     def draw_delaunay_tessellation(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
         """Draws Delaunay Tessellation for a specific match situation. """
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
         # Extract positions
-        # TODO: please change to filter 
         team1_positions = [player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
         team2_positions = [player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
 
@@ -351,22 +333,35 @@ class AnalyticsViewer:
                 if current_team == match.team1:
                     current_team = match.team2
                     fig.suptitle(f"Delaunay's tessellation of team {match.team2.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation(draw_pitch, pitch, team2_positions, "red", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
                 elif current_team == match.team2:
                     current_team = "both"
                     fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
-                    self.draw_positions_tessellation(draw_pitch, pitch, team1_positions, "blue", ax)
-                    self.draw_positions_tessellation(draw_pitch, pitch, team2_positions, "red", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
                 else:
                     current_team = match.team1
                     fig.suptitle(f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation(draw_pitch, pitch, team1_positions, "blue", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
                 fig.canvas.draw()
-
 
         fig.canvas.mpl_connect('key_press_event', lambda event: press(event))
         current_team = "both"
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
-        self.draw_positions_tessellation(draw_pitch, pitch, team1_positions, "blue", ax)
-        self.draw_positions_tessellation(draw_pitch, pitch, team2_positions, "red", ax)
+        self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
+        self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
         plt.show()
+        
+    def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, color, ax):
+        """Helper method for tessellation."""
+        draw_pitch.draw(figsize=(8, 6), ax=ax)
+        team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(pitch, team_positions)
+        draw_pitch.triplot(team_x_positions, team_y_positions, color=color, linewidth=2, ax=ax)
+        draw_pitch.scatter(team_x_positions, team_y_positions, color=color, s=150, zorder=10, ax=ax)
+
+    def get_team_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
+        """Helper method to extract team positions and transform them into the mplsoccer friendly format."""
+        team_positions: Tuple[float, float] = list(map(lambda position: pitch.normalize_pixel_position(position), team_positions))
+        team_x_positions = list(map(lambda position: position[0] * constants.MPLSOCCER_PITCH_LENGTH, team_positions))
+        team_y_positions = list(map(lambda position: position[1] * constants.MPLSOCCER_PITCH_WIDTH, team_positions))
+        return team_x_positions, team_y_positions
