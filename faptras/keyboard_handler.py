@@ -19,6 +19,12 @@ def forward_analytics_call(function, *args):
     cv.destroyAllWindows()
     function(*args)
     restart_visualizations()
+    
+def forward_analytics_calls(functions, *args):
+    cv.destroyAllWindows()
+    for function in functions:
+        function(*args)
+    restart_visualizations()
 
 def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.AnalyticsViewer, pitch: pitch.Pitch, match: match.Match, fps_rate: int, frame_id: int):
     """Handles key press at the end of each frame. Returns true if the visualization needs to be ended. False otherwise."""

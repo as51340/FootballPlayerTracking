@@ -111,7 +111,7 @@ class AnalyticsViewer:
         axs[1].bar_label(team2_plot)
         plt.show()    
     
-    def draw_player_velocities(self, i: int, j: int, axs, minutes: np.array, velocities: np.array, player: person.Player):
+    def draw_player_velocities(self, i: int, j: int, axs, minutes: np.array, velocities: np.array, player: person.Player, video_fps_rate: int):
         """Draws plot on a given axs determined with i and j indexes. Minutes presents times at which the sampling was done.
 
         Args:
@@ -120,7 +120,10 @@ class AnalyticsViewer:
             minutes (np.array): time samplings
             velocities (np.array): player velocities
             player (person.Player): a reference to the player
+            video_fps_rate (int): FPS rate of the original video
         """
+        velocities = velocities[::video_fps_rate]
+        minutes = minutes[::video_fps_rate]
         axs[i][j].plot(minutes, velocities)
         axs[i][j].legend(labels=[player.name])
         axs[i][j].set_xlabel("Minutes")
@@ -180,7 +183,7 @@ class AnalyticsViewer:
             player_ids.append(player.name)
             # Calculate minutes
             minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
-            self.draw_player_velocities(i, j, axs_velocites, minutes, v, player)
+            self.draw_player_velocities(i, j, axs_velocites, minutes, v, player, video_fps_rate)
         self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category)
     
     def show_match_sprint_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):

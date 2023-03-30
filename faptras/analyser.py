@@ -142,7 +142,9 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         # Handle key-press
         if keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id):
             return True, resolving_positions_cache
-   
+    
+    # Show at the end running statistics
+    keyboard_handler.forward_analytics_calls([analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
     return False, resolving_positions_cache
     
