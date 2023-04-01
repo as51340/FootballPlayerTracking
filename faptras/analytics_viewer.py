@@ -261,13 +261,14 @@ class AnalyticsViewer:
         pitch.scatter(x_positions, y_positions, ax=ax, edgecolor='black', facecolor='cornflowerblue')
         plt.show()
     
-    def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, current_frame: int, window: int):
+    def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
         """Visualizes last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
         # Drawing setup
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
         frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
         fig.suptitle(f"Visualizing last {seconds_to_visualize} seconds", color="black", fontsize=30)
+        frames_to_visualize_pad = frames_to_visualize + window - 1
         print(f"Frames to visualize: {frames_to_visualize}")
         # Setup markers to visualization
         # Assume that home is team1
@@ -276,14 +277,24 @@ class AnalyticsViewer:
         home, = ax.plot([], [], ms=10, markerfacecolor="blue", **marker_kwargs)  # purple
         away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
         
+        team1_positions = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
+        team2_positions = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
+           
+        
         def animate(frame):
             """Function used for animation. Sets data position for players."""
             # Get team1 positions
-            team1_positions = match.team1.get_player_positions_from_frame(current_frame - frame)
-            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions)
+            # Extract from np array
+            team1_positions_extracted = []
+            for player_positions in team1_positions:
+                team1_positions_extracted.append(player_positions[frame])
+            team2_positions_extracted = []
+            for player_positions in team2_positions:
+                team2_positions_extracted.append(player_positions[frame])
+
+            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions_extracted)
             # Get team2 positions
-            team2_positions = match.team2.get_player_positions_from_frame(current_frame - frame)
-            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions)
+            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions_extracted)
             # Set home and away data
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
@@ -292,6 +303,8 @@ class AnalyticsViewer:
         # call the animator, animate so 25 frames per second
         # must not remove anim!
         anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=constants.FPS_ANIMATIONS, blit=True)
+        writervideo = animation.FFMpegWriter(fps=25)
+        anim.save('smoothed_positions_7.mp4', writer=writervideo)
         plt.show() 
     
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):

@@ -1,5 +1,7 @@
 from typing import List, Tuple
 
+import numpy as np
+
 from person import Player
 
 class Team:
@@ -24,8 +26,22 @@ class Team:
                 return player
         return None
 
-    def get_player_positions_from_frame(self, frame: int):
-        """Retrieves all players from the frame "frame". """
-        return [player.all_positions[frame] for player in self.players if frame in player.all_positions.keys()]
+    def get_last_n_player_positions(self, frames: int, window: int) -> List[np.array]:
+        """Returns "frames" last positions of all players in the team. Doesn't take into account if some player wasn't tracked in some frames.
+
+        Args:
+            frames (int): Last N frames.
+            window (int): Smoothing window
+
+        Returns:
+            List[np.array]: List of players. For each player there is a numpy array representing both dimensions for last N frames.
+        """
+        ma_window = np.ones(window) / window
+        team_positions = []
+        for player in self.players:
+            player_positions = np.array(list(player.all_positions.values())[-frames:])
+            player_positions = np.apply_along_axis(lambda dim: np.convolve(dim, ma_window, mode="valid"), axis=0, arr=player_positions)
+            team_positions.append(player_positions)
+        return team_positions
     
     

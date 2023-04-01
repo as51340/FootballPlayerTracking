@@ -67,7 +67,7 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     elif k == ord('v'):  # voronoi diagrams
         forward_analytics_call(analytics_display.draw_voronoi_diagrams, match, pitch, frame_id)
     elif k == ord('a'):  # animations
-        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), frame_id, 3)
+        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), 5)
     return False
 
     
