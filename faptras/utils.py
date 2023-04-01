@@ -129,3 +129,13 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
             existing_objects_bb_info.append(bb_info_in_pitch[i])
             existing_objects_ids.append(object_ids_in_pitch[i])
     return existing_objects_detections, existing_objects_bb_info, existing_objects_ids
+
+def metabolic_cost(acc: np.array):
+    """Calculates metabolic cost from provided accelerations.
+    """ 
+    pos_acc_mask = acc >= 0
+    cost = np.zeros_like(acc)
+    cost[pos_acc_mask] = 0.102 * ((acc[pos_acc_mask] ** 2 + 96.2) ** 0.5) * (4.03 * acc[pos_acc_mask] + 3.6 * np.exp(-0.408 * acc[pos_acc_mask]))
+    cost[~pos_acc_mask] =  0.102 * ((acc[~pos_acc_mask] ** 2 + 96.2) ** 0.5) * (-0.85 * acc[~pos_acc_mask] + 3.6 * np.exp(1.33 * acc[~pos_acc_mask]))
+    print(cost)
+    return cost

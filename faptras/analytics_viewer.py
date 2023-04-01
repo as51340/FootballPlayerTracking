@@ -4,6 +4,7 @@ from collections import defaultdict
 import time
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import matplotlib.patheffects as path_effects
 from matplotlib import animation
 from matplotlib.colors import LinearSegmentedColormap
@@ -111,41 +112,56 @@ class AnalyticsViewer:
         axs[1].bar_label(team2_plot)
         plt.show()    
     
-    def draw_player_velocities(self, i: int, j: int, axs, minutes: np.array, velocities: np.array, player: person.Player, video_fps_rate: int):
+    def draw_player_info(self, i: int, j: int, axs, minutes: np.array, data: np.array, player: person.Player, video_fps_rate: int, y_label: str):
         """Draws plot on a given axs determined with i and j indexes. Minutes presents times at which the sampling was done.
 
         Args:
             i (int): row index
             j (int): column indexes
             minutes (np.array): time samplings
-            velocities (np.array): player velocities
+            data (np.array): Player data that needs to be plotted.
             player (person.Player): a reference to the player
             video_fps_rate (int): FPS rate of the original video
         """
-        velocities = velocities[::video_fps_rate]
+        data = data[::video_fps_rate]
         minutes = minutes[::video_fps_rate]
-        axs[i][j].plot(minutes, velocities)
+        axs[i][j].plot(minutes, data)
         axs[i][j].legend(labels=[player.name])
         axs[i][j].set_xlabel("Minutes")
-        axs[i][j].set_ylabel("Speed (m/s)")
+        axs[i][j].set_ylabel(y_label)
     
-    def draw_team_sprint_categories(self, player_ids: List, team_sprint_categories: pd.DataFrame, ax):
+    def draw_team_sprint_categories(self, player_ids: List, team_sprint_categories: pd.DataFrame, ax, y_label: str):
         """Draws sprint categories bar plot for a team.
 
         Args:
             player_ids (List): Player identificators.
             team_sprint_categories (pd.DataFrame): Sprint categories saved as a data frame.
             ax
+            y_label (str): Text for y label
         """
         x_axis = np.arange(len(player_ids))
         sprint_categories_plot = team_sprint_categories.plot.bar(ax=ax)
         ax.set_xticks(x_axis)
-        ax.set_xticklabels(x_axis, rotation=65)
-        ax.set_ylabel("Distance (m)")
+        ax.set_xticklabels(player_ids, rotation=65)
+        ax.set_ylabel(y_label)
         ax.legend()
         for container in sprint_categories_plot.containers:
            sprint_categories_plot.bar_label(container=container)
-        plt.show()
+           
+    def draw_scattered_total_distance_sprint_categories(self, player_ids: List, player_total_distances: List[float], team_sprint_categories: pd.DataFrame):
+        fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(16, 10), sharex=True)
+        fig.delaxes(axs[1][2])
+        colors = cm.rainbow(np.linspace(0, 1, len(team_sprint_categories.columns)))
+        for ind, col in enumerate(team_sprint_categories.columns):
+            i = ind // 3
+            j = ind % 3
+            axs[i][j].set_title(col)
+            axs[i][j].scatter(player_total_distances, team_sprint_categories[col], color=colors[ind])
+            axs[i][j].set_ylabel("Count")
+            axs[i][j].set_xlabel("Total distance run (m)")
+            for z, player_id in enumerate(player_ids):
+                axs[i][j].annotate(player_id, (player_total_distances[z], team_sprint_categories[col][z]))
+        
 
     def draw_team_sprint_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
         """Shows summmary for all players in one team.
@@ -161,30 +177,90 @@ class AnalyticsViewer:
         fig_velocities.suptitle(f"Team {team.name} player velocities", color="black", fontsize=30)
         fig_velocities.delaxes(axs_velocites[2][3])
         # Setup drawing context for sprint categories
+        # Setup distance for each sprint category
         fig_sprint_category, ax_sprint_category = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
-        fig_sprint_category.suptitle(f"Team {team.name} sprint categories", color="black", fontsize=30)
+        fig_sprint_category.suptitle(f"Team {team.name} sprint categories (distance)", color="black", fontsize=30)
+        # Setup count for each sprint category
+        fig_sprint_category_count, ax_sprint_category_count = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
+        fig_sprint_category_count.suptitle(f"Team {team.name} sprint categories (count)", color="black", fontsize=30)
         # Calculation parameters
         # Sprint categories
+        team_sprint_categories_count = defaultdict(list)  # number of times
         team_sprint_categories_dist = defaultdict(list)  # in meters
         player_ids = []
+        player_total_distances = []
         for ind, player in enumerate(team.players):
             # Indices
             i = ind // 4
             j = ind % 4
             # Speed calculation
             v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            player_total_distance = v.sum() / video_fps_rate
+            player_total_distances.append(player_total_distance)
             v[v > constants.MAX_SPEED] = np.nan  # discard wrong measurements
             # Now we will split velocities in categories and calculate distance covered in each sprint category
             team_sprint_categories_dist[utils.SprintCategory.WALKING].append(round(v[v <= constants.WALKING_MAX_SPEED].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.WALKING].append(v[v <= constants.WALKING_MAX_SPEED].size)
             team_sprint_categories_dist[utils.SprintCategory.EASY].append(round(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.EASY].append(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].size)
             team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(round(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.MODERATE].append(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].size)
             team_sprint_categories_dist[utils.SprintCategory.FAST].append(round(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.FAST].append(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].size)
             team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(round(v[v > constants.FAST_MAX_SPEED].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.VERY_FAST].append(v[v > constants.FAST_MAX_SPEED].size)
             player_ids.append(player.name)
             # Calculate minutes
             minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
-            self.draw_player_velocities(i, j, axs_velocites, minutes, v, player, video_fps_rate)
-        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category)
+            self.draw_player_info(i, j, axs_velocites, minutes, v, player, video_fps_rate, "Speed (m/s)")
+        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category, "Distance (m)")
+        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_count), ax_sprint_category_count, "Count")
+        self.draw_scattered_total_distance_sprint_categories(player_ids, player_total_distances, pd.DataFrame.from_dict(team_sprint_categories_count))
+        plt.show()
+        
+    def draw_team_acc_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
+        # Setup acceleration plots
+        fig_acc, axs_acc = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
+        fig_acc.suptitle(f"Team {team.name} player accelerations", color="black", fontsize=30)
+        fig_acc.delaxes(axs_acc[2][3])
+        # Setup metabolic plot for players
+        fig_mc, axs_mc = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
+        fig_mc.suptitle(f"Team {team.name} player metabolic cost", color="black", fontsize=30)
+        fig_mc.delaxes(axs_mc[2][3])
+        # Metabolic cost for teams
+        fig_mc_team, ax_mc_team = plt.subplots(nrows=1, ncols=1, figsize=(16, 10))
+        fig_mc_team.suptitle(f"Team {team.name} metabolic cost", color="black", fontsize=30)
+        # Data for storing
+        player_ids = []
+        player_total_distances = []
+        team_cost = None
+        for ind, player in enumerate(team.players):
+            # Indices
+            i = ind // 4
+            j = ind % 4
+            # Speed calculation
+            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            player_total_distance = v.sum() / video_fps_rate
+            player_total_distances.append(player_total_distance)
+            # Acceleration
+            acc = v / video_fps_rate
+            acc[acc > 6] = np.nan
+            mcost = utils.metabolic_cost(acc)
+            player_ids.append(player.name)
+            minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
+            if team_cost is None:
+                team_cost = np.zeros_like(minutes)
+            team_cost += mcost
+            self.draw_player_info(i, j, axs_acc, minutes, acc, player, video_fps_rate, "Acc (m/s^2)")
+            self.draw_player_info(i, j, axs_mc, minutes, mcost, player, video_fps_rate, "Metabolic cost")
+        ax_mc_team.plot(minutes, mcost / len(team.players))
+        ax_mc_team.set_ylabel("Metabolic cost")
+        ax_mc_team.set_xlabel("Minutes")
+        plt.show()
+        
+    def show_match_acc_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
+        self.draw_team_acc_summary(pitch, match.team1, video_fps_rate, window) 
+        self.draw_team_acc_summary(pitch, match.team2, video_fps_rate, window) 
     
     def show_match_sprint_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
         """Calculates speed of each player through the match. Takes into account fps rate of the original video and sampling period = windpw/
@@ -197,7 +273,6 @@ class AnalyticsViewer:
         """
         self.draw_team_sprint_summary(pitch, match.team1, video_fps_rate, window)
         self.draw_team_sprint_summary(pitch, match.team2, video_fps_rate, window)
-        plt.show()
     
     def draw_player_heatmap(self, match: match.Match, pitch: pitch.Pitch, player_id: int):
         """Draws heatmap for the given player."""
@@ -280,7 +355,6 @@ class AnalyticsViewer:
         team1_positions = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
         team2_positions = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
            
-        
         def animate(frame):
             """Function used for animation. Sets data position for players."""
             # Get team1 positions

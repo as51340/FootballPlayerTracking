@@ -26,7 +26,7 @@ prompter = thread_prompter.ThreadWithReturnValue()
 
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, 
                         analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, 
-                        fps_rate: int, resolving_positions_cache: dict = None):
+                        fps_rate: int, writer_orig, writer_det, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -136,13 +136,20 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 
         # Display
         cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
+        writer_det.write(frame_img_det)
         resolve_helper.storage.append(frame_img_det)
         cv.imshow(constants.VIDEO_WINDOW, video_frame)
+        writer_orig.write(video_frame)
         
         # Handle key-press
         if keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id):
+            writer_orig.release()
+            writer_det.release()
             return True, resolving_positions_cache
     
+    # Save videos
+    writer_orig.release()
+    writer_det.release()
     # Show at the end running statistics
     keyboard_handler.forward_analytics_calls([analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
@@ -158,6 +165,13 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     pitch_img = cv.imread(pitch.img_path, -1) 
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
+    
+    # Setup video writing
+    width_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_WIDTH))
+    height_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+    write_orig = cv.VideoWriter('bboxes.mp4', cv.VideoWriter_fourcc(*'DIVX'), 30, (width_orig,height_orig))
+    height_det, width_det, _ = pitch_img.shape
+    write_det = cv.VideoWriter('detections.mp4', cv.VideoWriter_fourcc(*'DIVX'), 30, (width_det,height_det))
     
     # Create analytical display
     fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
@@ -222,7 +236,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
-    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, fps_rate, resolving_positions_cache)
+    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, fps_rate, write_orig, write_det, resolving_positions_cache)
     # Restart the video if you didn't get any input
     print(f"Cache resolving: {cache_resolving} {len(resolving_positions_cache)} {resolving_positions_cache} {resolving_positions_cache_file}")
     if not cache_resolving and len(resolving_positions_cache) != 0:

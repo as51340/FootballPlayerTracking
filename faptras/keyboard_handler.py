@@ -31,23 +31,10 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     utils.check_kill(k)
     if k == ord('q'):
         return True  # Quit visualization
-    if k == ord('f'):
-        view.switch_screen_mode() # Switch between normal and full mode
-    elif k == ord('s'):
-        view.switch_draw_mode() # Switch drawing mode between circles and ids
-    elif k == ord('p'):
-        utils.pause() # Pause visualization
-    elif k == ord('r'):  # total run
-        forward_analytics_call(analytics_display.show_match_total_run, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
-    elif k == ord('t'):  # sprints
-        forward_analytics_call(analytics_display.show_match_sprint_summary, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
-    elif k == ord('h'):  # heat map for each player
-        print(f"Please enter player id: ")
-        try:
-            forward_analytics_call(analytics_display.draw_player_heatmap, match, pitch, int(input()))
-        except ValueError:
-            print(f"Wrong input, please restart your calculations...")
-            time.sleep(2)
+    elif k == ord('a'):  # animations
+        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), constants.POSITION_SMOOTHING_AVG_WINDOW)
+    elif k == ord('b'):
+        forward_analytics_call(analytics_display.show_match_acc_summary, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('c'):  # convex hull for a team
         print("Please enter team's name: ")
         team_name = input()
@@ -64,10 +51,25 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
             forward_analytics_call(analytics_display.draw_convex_hull_for_players, pitch, team, frame_id, left)
     elif k == ord('d'):  # delaunay tessellation
         forward_analytics_call(analytics_display.draw_delaunay_tessellation, match, pitch, frame_id)
+    elif k == ord('f'):
+        view.switch_screen_mode() # Switch between normal and full mode
+    elif k == ord('h'):  # heat map for each player
+        print(f"Please enter player id: ")
+        try:
+            forward_analytics_call(analytics_display.draw_player_heatmap, match, pitch, int(input()))
+        except ValueError:
+            print(f"Wrong input, please restart your calculations...")
+            time.sleep(2)
+    elif k == ord('p'):
+        utils.pause() # Pause visualization
+    elif k == ord('r'):  # total run
+        forward_analytics_call(analytics_display.show_match_total_run, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
+    elif k == ord('s'):
+        view.switch_draw_mode() # Switch drawing mode between circles and ids
+    elif k == ord('t'):  # sprints
+        forward_analytics_call(analytics_display.show_match_sprint_summary, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('v'):  # voronoi diagrams
         forward_analytics_call(analytics_display.draw_voronoi_diagrams, match, pitch, frame_id)
-    elif k == ord('a'):  # animations
-        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), 5)
     return False
 
     
