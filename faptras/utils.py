@@ -5,9 +5,11 @@ import sys
 import math
 from enum import Enum
 from functools import total_ordering
+from collections import defaultdict
 
 import numpy as np
 import cv2 as cv
+import pandas as pd
 
 import globals
 
@@ -49,12 +51,16 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
     detections, objects, bb_info = [], [], []
     def scaler_homo_func(row): return [int(
         row[0] / row[2]), int(row[1] / row[2])]
+    start = False
     with open(path_to_detections, "r") as d_file:
         lines = d_file.readlines()
         for line in lines:
             line = line.split(" ")
             # Extract bounding box information
-            frame_id = int(line[0])
+            if not start:
+                start = True
+                start_frame_id = int(line[0])
+            frame_id = int(line[0]) - start_frame_id + 1
             object_id = int(line[1])
             bb_left = float(line[2])
             bb_top = float(line[3])
@@ -133,9 +139,30 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
 def metabolic_cost(acc: np.array):
     """Calculates metabolic cost from provided accelerations.
     """ 
-    pos_acc_mask = acc >= 0
     cost = np.zeros_like(acc)
-    cost[pos_acc_mask] = 0.102 * ((acc[pos_acc_mask] ** 2 + 96.2) ** 0.5) * (4.03 * acc[pos_acc_mask] + 3.6 * np.exp(-0.408 * acc[pos_acc_mask]))
-    cost[~pos_acc_mask] =  0.102 * ((acc[~pos_acc_mask] ** 2 + 96.2) ** 0.5) * (-0.85 * acc[~pos_acc_mask] + 3.6 * np.exp(1.33 * acc[~pos_acc_mask]))
-    print(cost)
+    for i in range(acc.size):
+        if acc[i] > 0:
+            cost[i] = 0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * (4.03 * acc[i] + 3.6 * np.exp(-0.408 * acc[i]))
+        elif acc[i] < 0:
+            cost[i] =  0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * (-0.85 * acc[i] + 3.6 * np.exp(1.33 * acc[i]))
+        else:
+            acc[i] = 0.0
     return cost
+
+
+def extract_sequences(arr: np.array) -> pd.DataFrame:
+    """Extract sequences from array and puts it in the DataFrame by saving the size of each sequence.
+
+    Args:
+        arr (np.array): Source array
+
+    Returns:
+        pd.DataFrame: Resulting DataFrame.
+    """
+    # [0] is neeeded because of the returned array format
+    sequences = np.split(arr, np.where(np.diff(arr) != 0)[0] + 1)
+    data = defaultdict(list)
+    for seq in sequences:
+        data[seq[0]].append(len(seq))
+    return data
+    

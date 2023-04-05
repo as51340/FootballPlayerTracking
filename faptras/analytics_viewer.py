@@ -182,7 +182,10 @@ class AnalyticsViewer:
         fig_sprint_category.suptitle(f"Team {team.name} sprint categories (distance)", color="black", fontsize=30)
         # Setup count for each sprint category
         fig_sprint_category_count, ax_sprint_category_count = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
-        fig_sprint_category_count.suptitle(f"Team {team.name} sprint categories (count)", color="black", fontsize=30)
+        fig_sprint_category_count.suptitle(f"Team {team.name} sprint categories (seconds)", color="black", fontsize=30)
+        # Setup plots for distribution of sprint durations
+        fig_duration, axs_duration = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
+        fig_duration.suptitle(f"Team {team.name} sprint duration distribution", color="black", fontsize=20)
         # Calculation parameters
         # Sprint categories
         team_sprint_categories_count = defaultdict(list)  # number of times
@@ -198,24 +201,50 @@ class AnalyticsViewer:
             player_total_distance = v.sum() / video_fps_rate
             player_total_distances.append(player_total_distance)
             v[v > constants.MAX_SPEED] = np.nan  # discard wrong measurements
+            v_category = np.zeros_like(v)
             # Now we will split velocities in categories and calculate distance covered in each sprint category
+            # Walking
             team_sprint_categories_dist[utils.SprintCategory.WALKING].append(round(v[v <= constants.WALKING_MAX_SPEED].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.WALKING].append(v[v <= constants.WALKING_MAX_SPEED].size)
+            team_sprint_categories_count[utils.SprintCategory.WALKING].append(v[v <= constants.WALKING_MAX_SPEED].size / video_fps_rate)
+            v_category[v <= constants.WALKING_MAX_SPEED] = int(utils.SprintCategory.WALKING.value)-1
+            # Easy
             team_sprint_categories_dist[utils.SprintCategory.EASY].append(round(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.EASY].append(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].size)
+            team_sprint_categories_count[utils.SprintCategory.EASY].append(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)] = int(utils.SprintCategory.EASY.value)-1
+            # moderate
             team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(round(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.MODERATE].append(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].size)
+            team_sprint_categories_count[utils.SprintCategory.MODERATE].append(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)] = int(utils.SprintCategory.MODERATE.value)-1
+            # Fast
             team_sprint_categories_dist[utils.SprintCategory.FAST].append(round(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.FAST].append(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].size)
+            team_sprint_categories_count[utils.SprintCategory.FAST].append(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)] = int(utils.SprintCategory.FAST.value)-1
+            # very fast
             team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(round(v[v > constants.FAST_MAX_SPEED].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.VERY_FAST].append(v[v > constants.FAST_MAX_SPEED].size)
+            team_sprint_categories_count[utils.SprintCategory.VERY_FAST].append(v[v > constants.FAST_MAX_SPEED].size / video_fps_rate)
+            v_category[(v > constants.FAST_MAX_SPEED)] = int(utils.SprintCategory.VERY_FAST.value)-1
             player_ids.append(player.name)
             # Calculate minutes
             minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
             self.draw_player_info(i, j, axs_velocites, minutes, v, player, video_fps_rate, "Speed (m/s)")
         self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category, "Distance (m)")
-        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_count), ax_sprint_category_count, "Count")
+        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_count), ax_sprint_category_count, "Seconds (s)")
         self.draw_scattered_total_distance_sprint_categories(player_ids, player_total_distances, pd.DataFrame.from_dict(team_sprint_categories_count))
+        # Draw sprint category distribution
+        sprint_durations = utils.extract_sequences(v_category)
+        sprint_categories = [utils.SprintCategory.WALKING, utils.SprintCategory.EASY, utils.SprintCategory.MODERATE, utils.SprintCategory.FAST, utils.SprintCategory.VERY_FAST]
+        colors = ['tab:red', 'tab:blue', 'tab:green', 'tab:pink', 'tab:olive']
+        kwargs = dict(hist_kws={'alpha':.6}, kde_kws={'linewidth':2})
+        print(f"Number of sprint categories: {len(sprint_durations)}")
+        for sprint_category, durations in sprint_durations.items():
+            durations = list(map(lambda frame: frame / video_fps_rate, durations))
+            avg = round(sum(durations) / len(durations), 2)
+            print(sprint_categories[int(sprint_category)-1].name, avg)
+            sns.distplot(durations, color=colors[int(sprint_category)-1], label=sprint_categories[int(sprint_category)-1].name + " AVG: " + str(avg), ax=axs_duration, hist=False, **kwargs)
+        # axs_duration.set_xlim(right=min(maxs))
+        axs_duration.set_ylabel("Probability density")
+        axs_duration.set_xlabel("Seconds")
+        axs_duration.legend()
         plt.show()
         
     def draw_team_acc_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
@@ -225,15 +254,11 @@ class AnalyticsViewer:
         fig_acc.delaxes(axs_acc[2][3])
         # Setup metabolic plot for players
         fig_mc, axs_mc = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
-        fig_mc.suptitle(f"Team {team.name} player metabolic cost", color="black", fontsize=30)
+        fig_mc.suptitle(f"Team {team.name} player metabolic power", color="black", fontsize=30)
         fig_mc.delaxes(axs_mc[2][3])
-        # Metabolic cost for teams
-        fig_mc_team, ax_mc_team = plt.subplots(nrows=1, ncols=1, figsize=(16, 10))
-        fig_mc_team.suptitle(f"Team {team.name} metabolic cost", color="black", fontsize=30)
         # Data for storing
         player_ids = []
         player_total_distances = []
-        team_cost = None
         for ind, player in enumerate(team.players):
             # Indices
             i = ind // 4
@@ -243,19 +268,15 @@ class AnalyticsViewer:
             player_total_distance = v.sum() / video_fps_rate
             player_total_distances.append(player_total_distance)
             # Acceleration
-            acc = v / video_fps_rate
-            acc[acc > 6] = np.nan
+            acc = np.diff(v) * video_fps_rate
+            acc[acc > 6]  = np.nan
+            acc[acc < -6] = np.nan
             mcost = utils.metabolic_cost(acc)
+            mpower = mcost*v[1:]
             player_ids.append(player.name)
             minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
-            if team_cost is None:
-                team_cost = np.zeros_like(minutes)
-            team_cost += mcost
             self.draw_player_info(i, j, axs_acc, minutes, acc, player, video_fps_rate, "Acc (m/s^2)")
-            self.draw_player_info(i, j, axs_mc, minutes, mcost, player, video_fps_rate, "Metabolic cost")
-        ax_mc_team.plot(minutes, mcost / len(team.players))
-        ax_mc_team.set_ylabel("Metabolic cost")
-        ax_mc_team.set_xlabel("Minutes")
+            self.draw_player_info(i, j, axs_mc, minutes, mpower, player, video_fps_rate, "Metabolic power (J / kg*s)")
         plt.show()
         
     def show_match_acc_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):

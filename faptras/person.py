@@ -16,7 +16,7 @@ class Person:
         self.current_position: Tuple[float, float] = initial_position  # in 2D space in pixels
         self.sum_pos_x, self.sum_pos_y = initial_position_meters  # in meters
         self.total_times_seen = 1
-        self.last_seen_frame_id = 1
+        self.last_seen_frame_id = 2  # the first frame is removed because it is used for analytical purposes
         self.all_positions: Dict[int, Tuple[float, float]] = {1: initial_position}  # in 2D space in pixels
 
     def update_person_position(self, new_position: Tuple[float, float], new_position_meters: Tuple[float, float], current_frame_id: int) -> None:

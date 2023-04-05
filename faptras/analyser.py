@@ -53,7 +53,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     
     # Run visualizations
     for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
-        
+        print(f"Frame id: {frame_id}")
         # Real video
         _, video_frame = detections_vid_capture.read()
         
@@ -143,16 +143,16 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         
         # Handle key-press
         if keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id):
-            writer_orig.release()
-            writer_det.release()
+            # writer_orig.release()
+            # writer_det.release()
             return True, resolving_positions_cache
     
-    # Save videos
-    writer_orig.release()
-    writer_det.release()
-    # Show at the end running statistics
-    keyboard_handler.forward_analytics_calls([analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
+    # Save videos
+    writer_det.release()
+    writer_orig.release()
+    # Show at the end running statistics
+    keyboard_handler.forward_analytics_calls([analytics_display.show_match_acc_summary, analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     return False, resolving_positions_cache
     
 def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str, 
