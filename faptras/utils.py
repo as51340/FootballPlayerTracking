@@ -5,7 +5,7 @@ import sys
 import math
 from enum import Enum
 from functools import total_ordering
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import numpy as np
 import cv2 as cv
@@ -46,7 +46,7 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
         H (np.ndarray): Homography matrix.
     """
     start_time = time.time()
-    storage = dict()
+    storage = OrderedDict()
     last_frame_id = sys.maxsize
     detections, objects, bb_info = [], [], []
     def scaler_homo_func(row): return [int(

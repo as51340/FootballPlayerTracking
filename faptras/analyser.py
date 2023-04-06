@@ -1,7 +1,7 @@
-from typing import List, Tuple, Dict
+from typing import Dict
+from collections import OrderedDict
 import time
 import argparse
-import os
 import json
 
 import numpy as np
@@ -21,12 +21,19 @@ import resolve_helpers as resolve_helpers
 import ai_resolver
 import sanity_checker
 import keyboard_handler
+from game_situations import GameSituations
+
 
 prompter = thread_prompter.ThreadWithReturnValue()
 
+def end_visualizations(game_situations: GameSituations, writer_det, writer_orig):
+    game_situations.video.release()
+    # writer_det.release()
+    # writer_orig.release()w
+
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture, 
                         analytics_display: analytics_viewer.AnalyticsViewer, resolver: ai_resolver.Resolver, sanitizer: sanity_checker.SanityChecker, 
-                        fps_rate: int, writer_orig, writer_det, resolving_positions_cache: dict = None):
+                        fps_rate: int, writer_orig, writer_det, game_situations: GameSituations, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -52,7 +59,10 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)
     
     # Run visualizations
-    for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
+    detections_storage = list(detections_storage.items())  # it is ordered dict so order is preserved
+    frame_index = 0
+    while frame_index < len(detections_storage):
+        frame_id, (detections_per_frame, bb_info, object_ids) = detections_storage[frame_index]
         # Real video
         _, video_frame = detections_vid_capture.read()
         
@@ -140,16 +150,23 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         cv.imshow(constants.VIDEO_WINDOW, video_frame)
         writer_orig.write(video_frame)
         
+        # Check whether we need to save some frame to the video
+        if game_situations.needs_saving():
+            game_situations.video.write(video_frame)
+        
         # Handle key-press
-        if keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id):
-            # writer_orig.release()
-            # writer_det.release()
+        stop, seek_frame = keyboard_handler.handle_key_press(k, view_, analytics_display, pitch, match, fps_rate, frame_id, game_situations)
+        if stop:
+            end_visualizations(game_situations, writer_det, writer_orig) 
             return True, resolving_positions_cache
-    
+        if seek_frame != 0:
+            frame_index = min(len(detections_storage)-1, max(0, frame_index+seek_frame))
+            detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, frame_index)
+        else:
+            frame_index += 1
+                                               
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
-    # Save videos
-    writer_det.release()
-    writer_orig.release()
+    end_visualizations(game_situations, writer_det, writer_orig) 
     # Show at the end running statistics
     keyboard_handler.forward_analytics_calls([analytics_display.show_match_acc_summary, analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     return False, resolving_positions_cache
@@ -164,16 +181,17 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     pitch_img = cv.imread(pitch.img_path, -1) 
     # Setup video reading
     detections_vid_capture = cv.VideoCapture(path_to_video)
+    fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
     
     # Setup video writing
     width_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_WIDTH))
     height_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+    game_situations = GameSituations(width_orig, height_orig, fps_rate)
     write_orig = cv.VideoWriter('bboxes.mp4', cv.VideoWriter_fourcc(*'DIVX'), 30, (width_orig,height_orig))
     height_det, width_det, _ = pitch_img.shape
     write_det = cv.VideoWriter('detections.mp4', cv.VideoWriter_fourcc(*'DIVX'), 30, (width_det,height_det))
     
     # Create analytical display
-    fps_rate = int(detections_vid_capture.get(cv.CAP_PROP_FPS))
     analytics_display = analytics_viewer.AnalyticsViewer()
     
     # Create ai_resolver object
@@ -198,7 +216,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     else:
         reference_frame, H = homography.do_homography(view_, detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
     print(f"H: {H:}")
-    detections_storage = utils.squash_detections(path_to_detections, H)
+    detections_storage: OrderedDict = utils.squash_detections(path_to_detections, H)
     
     if cache_resolving:
         try:
@@ -235,7 +253,9 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det, y_coord_det); # where to put the window
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     # Run visualizations
-    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, analytics_display, resolver, sanitizer, fps_rate, write_orig, write_det, resolving_positions_cache)
+    status, resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture, 
+                                                            analytics_display, resolver, sanitizer, fps_rate, write_orig, write_det, 
+                                                            game_situations, resolving_positions_cache)
     # Restart the video if you didn't get any input
     print(f"Cache resolving: {cache_resolving} {len(resolving_positions_cache)} {resolving_positions_cache} {resolving_positions_cache_file}")
     if not cache_resolving and len(resolving_positions_cache) != 0:

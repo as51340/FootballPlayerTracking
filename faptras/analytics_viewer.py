@@ -386,8 +386,8 @@ class AnalyticsViewer:
     
         def animate(frame):
             """Function used for animation. Sets data position for players."""
-            team1_positions_extracted = [player_positions[frame] for player_positions in team1_positions if frame < player_positions.size]
-            team2_positions_extracted = [player_positions[frame] for player_positions in team2_positions if frame < player_positions.size]
+            team1_positions_extracted = [player_positions[frame] for player_positions in team1_positions if frame < player_positions.shape[0]]
+            team2_positions_extracted = [player_positions[frame] for player_positions in team2_positions if frame < player_positions.shape[0]]
             
             team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions_extracted)
             team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions_extracted)
@@ -403,7 +403,8 @@ class AnalyticsViewer:
 
         # call the animator, animate so 25 frames per second
         # must not remove anim!
-        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=10, blit=True)
+        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=25, blit=True)
+        # anim.save("switch_positions.mp4")
         plt.show() 
     
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):

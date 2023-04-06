@@ -8,6 +8,7 @@ import constants
 import analytics_viewer
 import pitch
 import match
+from game_situations import GameSituations
 
 
 def restart_visualizations():
@@ -26,11 +27,13 @@ def forward_analytics_calls(functions, *args):
         function(*args)
     restart_visualizations()
 
-def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.AnalyticsViewer, pitch: pitch.Pitch, match: match.Match, fps_rate: int, frame_id: int):
+def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.AnalyticsViewer, pitch: pitch.Pitch, 
+                     match: match.Match, fps_rate: int, frame_id: int, game_situations: GameSituations):
     """Handles key press at the end of each frame. Returns true if the visualization needs to be ended. False otherwise."""
     utils.check_kill(k)
+    seek_frames = 0
     if k == ord('q'):
-        return True  # Quit visualization
+        return True, seek_frames  # Quit visualization
     elif k == ord('a'):  # animations
         forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(5, int(frame_id / fps_rate)), constants.POSITION_SMOOTHING_AVG_WINDOW)
     elif k == ord('b'):
@@ -60,6 +63,12 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
         except ValueError:
             print(f"Wrong input, please restart your calculations...")
             time.sleep(2)
+    elif k == ord('j'):
+        seek_frames = -5 * fps_rate
+    elif k == ord('l'):
+        seek_frames = 5 * fps_rate
+    elif k == ord('m'):
+        game_situations.switch_mode()
     elif k == ord('p'):
         utils.pause() # Pause visualization
     elif k == ord('r'):  # total run
@@ -70,6 +79,6 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
         forward_analytics_call(analytics_display.show_match_sprint_summary, pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('v'):  # voronoi diagrams
         forward_analytics_call(analytics_display.draw_voronoi_diagrams, match, pitch, frame_id)
-    return False
+    return False, seek_frames
 
     
