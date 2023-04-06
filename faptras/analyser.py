@@ -53,7 +53,6 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     
     # Run visualizations
     for frame_id, (detections_per_frame, bb_info, object_ids) in detections_storage.items(): 
-        print(f"Frame id: {frame_id}")
         # Real video
         _, video_frame = detections_vid_capture.read()
         

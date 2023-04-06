@@ -339,6 +339,7 @@ class AnalyticsViewer:
         """
         # Extract positons
         positions = [player.current_position for player in team.players if player.last_seen_frame_id == current_frame]
+        team_ids = [player.name for player in team.players if player.last_seen_frame_id == current_frame]
         x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, positions)
         if left:
             # Then the goalkeeper is on the left side so we should remove the min x player
@@ -348,6 +349,7 @@ class AnalyticsViewer:
             index_to_remove = max(range(len(x_positions)), key=x_positions.__getitem__)
         del x_positions[index_to_remove]
         del y_positions[index_to_remove]
+        del team_ids[index_to_remove]
         # Draw the pitch
         pitch = mplsoccer.pitch.Pitch()
         fig, ax = pitch.draw(figsize=(8, 6))
@@ -355,6 +357,8 @@ class AnalyticsViewer:
         hull = pitch.convexhull(x_positions, y_positions)
         pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue', facecolor='cornflowerblue', alpha=0.3)
         pitch.scatter(x_positions, y_positions, ax=ax, edgecolor='black', facecolor='cornflowerblue')
+        for i, player_id in enumerate(team_ids):
+            ax.text(x_positions[i] + 1.5, y_positions[i] + 1.5, player_id, color="black")
         plt.show()
     
     def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
@@ -373,27 +377,50 @@ class AnalyticsViewer:
         home, = ax.plot([], [], ms=10, markerfacecolor="blue", **marker_kwargs)  # purple
         away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
         
-        team1_positions = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
-        team2_positions = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
-           
+        team1_text, team2_text = [], []
+        for _ in range(11):
+            text_obj = ax.annotate("", (0, 0), color="black")
+            team1_text.append(text_obj)
+            
+        for _ in range(11):
+            text_obj = ax.annotate("", (0, 0), color="black")
+            team2_text.append(text_obj)
+            
         def animate(frame):
             """Function used for animation. Sets data position for players."""
             # Get team1 positions
             # Extract from np array
+            team1_positions, team1_ids = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
+            team2_positions, team2_ids = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
+
             team1_positions_extracted = []
             for player_positions in team1_positions:
+                if frame >= len(player_positions):
+                    continue
                 team1_positions_extracted.append(player_positions[frame])
             team2_positions_extracted = []
             for player_positions in team2_positions:
+                if frame >= len(player_positions):
+                    continue
                 team2_positions_extracted.append(player_positions[frame])
-
+            
             team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions_extracted)
             # Get team2 positions
             team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions_extracted)
             # Set home and away data
+            
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
-            return home, away
+            
+            for i, text in enumerate(team1_text):
+                text.set_position((team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
+                text.set_text(team1_ids[i])
+                
+            for i, text in enumerate(team2_text):
+                text.set_position((team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
+                text.set_text(team2_ids[i])
+
+            return home, away, *team1_text, *team2_text
 
         # call the animator, animate so 25 frames per second
         # must not remove anim!
@@ -406,8 +433,10 @@ class AnalyticsViewer:
         """Draws voronoi diagrams for the current match situation to see how well the space is covered for each player."""
         # Extract positions
         team1_positions = [player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_ids = [player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
         team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions)
         team2_positions = [player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_ids = [player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
         team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions)
         # Draw pitch
         draw_pitch = mplsoccer.pitch.Pitch()
@@ -420,7 +449,11 @@ class AnalyticsViewer:
         draw_pitch.polygon(team2, ax=ax, fc='red', ec='black', lw=3, alpha=0.4)
         # Plot players
         draw_pitch.scatter(team1_x_positions, team1_y_positions, c='yellow', s=80, ec='k', ax=ax)
+        for i, player_id in enumerate(team1_ids):
+            ax.text(team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5, player_id, color="black")
         draw_pitch.scatter(team2_x_positions, team2_y_positions, c='red', s=80, ec='k', ax=ax)
+        for i, player_id in enumerate(team2_ids):
+            ax.text(team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5, player_id, color="black")
         plt.show()
                 
     def draw_delaunay_tessellation(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
@@ -430,7 +463,9 @@ class AnalyticsViewer:
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
         # Extract positions
         team1_positions = [player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_ids = [player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
         team2_positions = [player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_ids = [player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
 
         global current_team
         current_team = match.team1
@@ -441,31 +476,35 @@ class AnalyticsViewer:
                 if current_team == match.team1:
                     current_team = match.team2
                     fig.suptitle(f"Delaunay's tessellation of team {match.team2.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
                 elif current_team == match.team2:
                     current_team = "both"
                     fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
                 else:
                     current_team = match.team1
                     fig.suptitle(f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
+                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
                 fig.canvas.draw()
 
         fig.canvas.mpl_connect('key_press_event', lambda event: press(event))
         current_team = "both"
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
-        self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, "blue", ax)
-        self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, "red", ax)
+        # TODO: change blue/red to some method
+        self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+        self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
         plt.show()
         
-    def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, color, ax):
+    def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, team_ids: List, color, ax):
         """Helper method for tessellation."""
         draw_pitch.draw(figsize=(8, 6), ax=ax)
         team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(pitch, team_positions)
         draw_pitch.triplot(team_x_positions, team_y_positions, color=color, linewidth=2, ax=ax)
         draw_pitch.scatter(team_x_positions, team_y_positions, color=color, s=150, zorder=10, ax=ax)
+        for i, player_id in enumerate(team_ids):
+            ax.text(team_x_positions[i] + 1.5, team_y_positions[i] + 1.5, player_id, color=color)
+        
 
     def get_team_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
         """Helper method to extract team positions and transform them into the mplsoccer friendly format."""

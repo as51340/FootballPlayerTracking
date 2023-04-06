@@ -38,10 +38,13 @@ class Team:
         """
         ma_window = np.ones(window) / window
         team_positions = []
+        player_ids = []
+        assert len(self.players) == 11
         for player in self.players:
             player_positions = np.array(list(player.all_positions.values())[-frames:])
             player_positions = np.apply_along_axis(lambda dim: np.convolve(dim, ma_window, mode="valid"), axis=0, arr=player_positions)
             team_positions.append(player_positions)
-        return team_positions
+            player_ids.append(player.name)
+        return team_positions, player_ids
     
     
