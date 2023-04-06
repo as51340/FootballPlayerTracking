@@ -1,11 +1,9 @@
-import multiprocessing as mp
 from typing import List, Tuple, Dict
 from collections import defaultdict
 import time
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import matplotlib.patheffects as path_effects
 from matplotlib import animation
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
@@ -13,6 +11,7 @@ import seaborn as sns
 import mplsoccer
 import numpy as np
 import pandas as pd
+from time import time
 
 import match
 import person
@@ -377,56 +376,47 @@ class AnalyticsViewer:
         home, = ax.plot([], [], ms=10, markerfacecolor="blue", **marker_kwargs)  # purple
         away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
         
+        team1_positions, team1_ids = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
+        team2_positions, team2_ids = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
+
         team1_text, team2_text = [], []
-        for _ in range(11):
-            text_obj = ax.annotate("", (0, 0), color="black")
+        for i in range(11):
+            text_obj = ax.annotate(team1_ids[i], (0, 0), color="black")
             team1_text.append(text_obj)
             
-        for _ in range(11):
-            text_obj = ax.annotate("", (0, 0), color="black")
+        for i in range(11):
+            text_obj = ax.annotate(team2_ids[i], (0, 0), color="black")
             team2_text.append(text_obj)
-            
+    
+        
         def animate(frame):
             """Function used for animation. Sets data position for players."""
-            # Get team1 positions
-            # Extract from np array
-            team1_positions, team1_ids = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
-            team2_positions, team2_ids = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
-
             team1_positions_extracted = []
             for player_positions in team1_positions:
-                if frame >= len(player_positions):
+                if frame >= player_positions.size:  # you will skip this player
                     continue
                 team1_positions_extracted.append(player_positions[frame])
             team2_positions_extracted = []
             for player_positions in team2_positions:
-                if frame >= len(player_positions):
+                if frame >= player_positions.size:
                     continue
                 team2_positions_extracted.append(player_positions[frame])
             
             team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions_extracted)
-            # Get team2 positions
             team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions_extracted)
-            # Set home and away data
             
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
             
-            for i, text in enumerate(team1_text):
-                text.set_position((team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
-                text.set_text(team1_ids[i])
-                
-            for i, text in enumerate(team2_text):
-                text.set_position((team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
-                text.set_text(team2_ids[i])
+            for i in range(11):
+                team1_text[i].set_position((team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
+                team2_text[i].set_position((team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
 
             return home, away, *team1_text, *team2_text
 
         # call the animator, animate so 25 frames per second
         # must not remove anim!
-        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=constants.FPS_ANIMATIONS, blit=True)
-        writervideo = animation.FFMpegWriter(fps=25)
-        anim.save('smoothed_positions_7.mp4', writer=writervideo)
+        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=12, blit=True)
         plt.show() 
     
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):

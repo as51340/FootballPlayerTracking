@@ -34,7 +34,7 @@ class Team:
             window (int): Smoothing window
 
         Returns:
-            List[np.array]: List of players. For each player there is a numpy array representing both dimensions for last N frames.
+            List[np.array], List[player_id]: List of players. For each player there is a numpy array representing both dimensions for last N frames.
         """
         ma_window = np.ones(window) / window
         team_positions = []
