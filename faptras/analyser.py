@@ -3,6 +3,8 @@ from collections import OrderedDict
 import time
 import argparse
 import json
+from enum import Enum
+
 
 import numpy as np
 import cv2 as cv
@@ -23,8 +25,9 @@ import sanity_checker
 import keyboard_handler
 from game_situations import GameSituations
 
-
 prompter = thread_prompter.ThreadWithReturnValue()
+
+VisualizationMode = Enum("VisualizationMode", ["PLAY", "SKIP"])
 
 def end_visualizations(game_situations: GameSituations, writer_det, writer_orig):
     game_situations.video.release()
@@ -57,6 +60,8 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         cache_resolving = False
     
     resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)
+
+    visualization_mode = VisualizationMode.PLAY
     
     # Run visualizations
     detections_storage = list(detections_storage.items())  # it is ordered dict so order is preserved
@@ -142,14 +147,16 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 view_.draw_person(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), person_color)
                 view.View.box_label(video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                 person.update_person_position(frame_detection, pitch.pixel_to_meters_positions(frame_detection), frame_id)
-                
-        # Display
-        cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
-        writer_det.write(frame_img_det)
-        resolve_helper.storage.append(frame_img_det)
-        cv.imshow(constants.VIDEO_WINDOW, video_frame)
-        writer_orig.write(video_frame)
         
+        # This action needs to be done no matter the visualization mode        
+        if visualization_mode == VisualizationMode.PLAY:
+            # Display
+            cv.imshow(constants.DETECTIONS_WINDOW, frame_img_det)
+            cv.imshow(constants.VIDEO_WINDOW, video_frame)
+        
+        resolve_helper.storage.append(frame_img_det)
+        # writer_det.write(frame_img_det)
+        # writer_orig.write(video_frame)
         # Check whether we need to save some frame to the video
         if game_situations.needs_saving():
             game_situations.video.write(video_frame)
@@ -160,9 +167,11 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             end_visualizations(game_situations, writer_det, writer_orig) 
             return True, resolving_positions_cache
         if seek_frame != 0:
+            visualization_mode = VisualizationMode.SKIP
             frame_index = min(len(detections_storage)-1, max(0, frame_index+seek_frame))
             detections_vid_capture.set(cv.CAP_PROP_POS_FRAMES, frame_index)
         else:
+            visualization_mode = VisualizationMode.PLAY
             frame_index += 1
                                                
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
