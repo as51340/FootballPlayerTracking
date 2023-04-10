@@ -7,6 +7,7 @@ import matplotlib.cm as cm
 from matplotlib import animation
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
+from shapely.geometry import Polygon
 import seaborn as sns
 import mplsoccer
 import numpy as np
@@ -20,8 +21,9 @@ import pitch
 import team
 import constants
 
+
 class AnalyticsViewer:
-    
+
     def estimate_player_speed(self, pitch: pitch.Pitch, player: person.Player, video_fps_rate: int, window: int) -> np.array:
         """Estimates player speed through the match by using moving average window algorithm.
 
@@ -36,9 +38,12 @@ class AnalyticsViewer:
         """
         ma_window = np.ones(window) / window   # moving average windows
         dt = 1 / video_fps_rate  # sampling rate
-        player_meters_positions = list(map(lambda position: pitch.pixel_to_meters_positions(position), player.all_positions.values()))
-        player_x_positions = np.array(list(map(lambda position: position[0], player_meters_positions)))
-        player_y_positions = np.array(list(map(lambda position: position[1], player_meters_positions)))
+        player_meters_positions = list(map(lambda position: pitch.pixel_to_meters_positions(
+            position), player.all_positions.values()))
+        player_x_positions = np.array(
+            list(map(lambda position: position[0], player_meters_positions)))
+        player_y_positions = np.array(
+            list(map(lambda position: position[1], player_meters_positions)))
         x_diff = np.diff(player_x_positions)
         y_diff = np.diff(player_y_positions)
         vx = x_diff / dt
@@ -46,7 +51,7 @@ class AnalyticsViewer:
         vx = np.convolve(vx, ma_window, mode="same")
         vy = np.convolve(vy, ma_window, mode="same")
         return np.sqrt(vx**2 + vy**2)
-        
+
     def estimate_team_total_run(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int) -> Tuple[float, List[str], List[float]]:
         """Estimates how much players of one team ran throughout the match.
 
@@ -64,15 +69,17 @@ class AnalyticsViewer:
         # iterate over all players
         for player in team.players:
             # Get player positions
-            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            v = self.estimate_player_speed(
+                pitch, player, video_fps_rate, window)
             player_total_distance = v.sum() / video_fps_rate
             team_total_run += player_total_distance
             player_ids.append(player.name)
             player_distances.append(player_total_distance)
         team_total_run = round(team_total_run, 1)
-        player_distances = list(map(lambda dist: round(dist, 1), player_distances))
+        player_distances = list(
+            map(lambda dist: round(dist, 1), player_distances))
         return team_total_run, player_ids, player_distances
-            
+
     def show_match_total_run(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
         """Shows total run statistic for the whole match. Estimates how much each player run throughout the recording with the moving average window.
 
@@ -83,8 +90,10 @@ class AnalyticsViewer:
             window (int): Size of the window used for estimation.
         """
         # Get team data
-        team1_total_run, team1_players_id, team1_players_total_run = self.estimate_team_total_run(pitch, match.team1, video_fps_rate, window)
-        team2_total_run, team2_players_id, team2_players_total_run = self.estimate_team_total_run(pitch, match.team2, video_fps_rate, window)
+        team1_total_run, team1_players_id, team1_players_total_run = self.estimate_team_total_run(
+            pitch, match.team1, video_fps_rate, window)
+        team2_total_run, team2_players_id, team2_players_total_run = self.estimate_team_total_run(
+            pitch, match.team2, video_fps_rate, window)
         team_data = [team1_total_run, team2_total_run]
         labels = [match.team1.name, match.team2.name]
         _, ax = plt.subplots(figsize=(8, 6))
@@ -109,8 +118,8 @@ class AnalyticsViewer:
         axs[1].set_xticks(team2_ind)
         axs[1].set_xticklabels(team2_players_id, rotation=65)
         axs[1].bar_label(team2_plot)
-        plt.show()    
-    
+        plt.show()
+
     def draw_player_info(self, i: int, j: int, axs, minutes: np.array, data: np.array, player: person.Player, video_fps_rate: int, y_label: str):
         """Draws plot on a given axs determined with i and j indexes. Minutes presents times at which the sampling was done.
 
@@ -128,7 +137,7 @@ class AnalyticsViewer:
         axs[i][j].legend(labels=[player.name])
         axs[i][j].set_xlabel("Minutes")
         axs[i][j].set_ylabel(y_label)
-    
+
     def draw_team_sprint_categories(self, player_ids: List, team_sprint_categories: pd.DataFrame, ax, y_label: str):
         """Draws sprint categories bar plot for a team.
 
@@ -145,22 +154,25 @@ class AnalyticsViewer:
         ax.set_ylabel(y_label)
         ax.legend()
         for container in sprint_categories_plot.containers:
-           sprint_categories_plot.bar_label(container=container)
-           
+            sprint_categories_plot.bar_label(container=container)
+
     def draw_scattered_total_distance_sprint_categories(self, player_ids: List, player_total_distances: List[float], team_sprint_categories: pd.DataFrame):
-        fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(16, 10), sharex=True)
+        fig, axs = plt.subplots(
+            nrows=2, ncols=3, figsize=(16, 10), sharex=True)
         fig.delaxes(axs[1][2])
-        colors = cm.rainbow(np.linspace(0, 1, len(team_sprint_categories.columns)))
+        colors = cm.rainbow(np.linspace(
+            0, 1, len(team_sprint_categories.columns)))
         for ind, col in enumerate(team_sprint_categories.columns):
             i = ind // 3
             j = ind % 3
             axs[i][j].set_title(col)
-            axs[i][j].scatter(player_total_distances, team_sprint_categories[col], color=colors[ind])
+            axs[i][j].scatter(player_total_distances,
+                              team_sprint_categories[col], color=colors[ind])
             axs[i][j].set_ylabel("Count")
             axs[i][j].set_xlabel("Total distance run (m)")
             for z, player_id in enumerate(player_ids):
-                axs[i][j].annotate(player_id, (player_total_distances[z], team_sprint_categories[col][z]))
-        
+                axs[i][j].annotate(
+                    player_id, (player_total_distances[z], team_sprint_categories[col][z]))
 
     def draw_team_sprint_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
         """Shows summmary for all players in one team.
@@ -172,19 +184,27 @@ class AnalyticsViewer:
             window (int): Smoothing window size.
         """
         # Setup drawing context for velocities
-        fig_velocities, axs_velocites = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
-        fig_velocities.suptitle(f"Team {team.name} player velocities", color="black", fontsize=30)
+        fig_velocities, axs_velocites = plt.subplots(
+            nrows=3, ncols=4, figsize=(16, 10), sharey=True)
+        fig_velocities.suptitle(
+            f"Team {team.name} player velocities", color="black", fontsize=30)
         fig_velocities.delaxes(axs_velocites[2][3])
         # Setup drawing context for sprint categories
         # Setup distance for each sprint category
-        fig_sprint_category, ax_sprint_category = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
-        fig_sprint_category.suptitle(f"Team {team.name} sprint categories (distance)", color="black", fontsize=30)
+        fig_sprint_category, ax_sprint_category = plt.subplots(
+            nrows=1, ncols=1, figsize=(8, 6))
+        fig_sprint_category.suptitle(
+            f"Team {team.name} sprint categories (distance)", color="black", fontsize=30)
         # Setup count for each sprint category
-        fig_sprint_category_count, ax_sprint_category_count = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
-        fig_sprint_category_count.suptitle(f"Team {team.name} sprint categories (seconds)", color="black", fontsize=30)
+        fig_sprint_category_count, ax_sprint_category_count = plt.subplots(
+            nrows=1, ncols=1, figsize=(8, 6))
+        fig_sprint_category_count.suptitle(
+            f"Team {team.name} sprint categories (seconds)", color="black", fontsize=30)
         # Setup plots for distribution of sprint durations
-        fig_duration, axs_duration = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
-        fig_duration.suptitle(f"Team {team.name} sprint duration distribution", color="black", fontsize=20)
+        fig_duration, axs_duration = plt.subplots(
+            nrows=1, ncols=1, figsize=(8, 6))
+        fig_duration.suptitle(
+            f"Team {team.name} sprint duration distribution", color="black", fontsize=20)
         # Calculation parameters
         # Sprint categories
         team_sprint_categories_count = defaultdict(list)  # number of times
@@ -196,92 +216,128 @@ class AnalyticsViewer:
             i = ind // 4
             j = ind % 4
             # Speed calculation
-            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            v = self.estimate_player_speed(
+                pitch, player, video_fps_rate, window)
             player_total_distance = v.sum() / video_fps_rate
             player_total_distances.append(player_total_distance)
             v[v > constants.MAX_SPEED] = np.nan  # discard wrong measurements
             v_category = np.zeros_like(v)
             # Now we will split velocities in categories and calculate distance covered in each sprint category
             # Walking
-            team_sprint_categories_dist[utils.SprintCategory.WALKING].append(round(v[v <= constants.WALKING_MAX_SPEED].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.WALKING].append(v[v <= constants.WALKING_MAX_SPEED].size / video_fps_rate)
-            v_category[v <= constants.WALKING_MAX_SPEED] = int(utils.SprintCategory.WALKING.value)-1
+            team_sprint_categories_dist[utils.SprintCategory.WALKING].append(
+                round(v[v <= constants.WALKING_MAX_SPEED].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.WALKING].append(
+                v[v <= constants.WALKING_MAX_SPEED].size / video_fps_rate)
+            v_category[v <= constants.WALKING_MAX_SPEED] = int(
+                utils.SprintCategory.WALKING.value)-1
             # Easy
-            team_sprint_categories_dist[utils.SprintCategory.EASY].append(round(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.EASY].append(v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].size / video_fps_rate)
-            v_category[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)] = int(utils.SprintCategory.EASY.value)-1
+            team_sprint_categories_dist[utils.SprintCategory.EASY].append(round(
+                v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.EASY].append(
+                v[(v > constants.WALKING_MAX_SPEED) & (v <= constants.EASY_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.WALKING_MAX_SPEED) & (
+                v <= constants.EASY_MAX_SPEED)] = int(utils.SprintCategory.EASY.value)-1
             # moderate
-            team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(round(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.MODERATE].append(v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].size / video_fps_rate)
-            v_category[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)] = int(utils.SprintCategory.MODERATE.value)-1
+            team_sprint_categories_dist[utils.SprintCategory.MODERATE].append(round(
+                v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.MODERATE].append(
+                v[(v > constants.EASY_MAX_SPEED) & (v <= constants.MODERATE_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.EASY_MAX_SPEED) & (
+                v <= constants.MODERATE_MAX_SPEED)] = int(utils.SprintCategory.MODERATE.value)-1
             # Fast
-            team_sprint_categories_dist[utils.SprintCategory.FAST].append(round(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.FAST].append(v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].size / video_fps_rate)
-            v_category[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)] = int(utils.SprintCategory.FAST.value)-1
+            team_sprint_categories_dist[utils.SprintCategory.FAST].append(round(
+                v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.FAST].append(
+                v[(v > constants.MODERATE_MAX_SPEED) & (v <= constants.FAST_MAX_SPEED)].size / video_fps_rate)
+            v_category[(v > constants.MODERATE_MAX_SPEED) & (
+                v <= constants.FAST_MAX_SPEED)] = int(utils.SprintCategory.FAST.value)-1
             # very fast
-            team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(round(v[v > constants.FAST_MAX_SPEED].sum() / video_fps_rate, 1))
-            team_sprint_categories_count[utils.SprintCategory.VERY_FAST].append(v[v > constants.FAST_MAX_SPEED].size / video_fps_rate)
-            v_category[(v > constants.FAST_MAX_SPEED)] = int(utils.SprintCategory.VERY_FAST.value)-1
+            team_sprint_categories_dist[utils.SprintCategory.VERY_FAST].append(
+                round(v[v > constants.FAST_MAX_SPEED].sum() / video_fps_rate, 1))
+            team_sprint_categories_count[utils.SprintCategory.VERY_FAST].append(
+                v[v > constants.FAST_MAX_SPEED].size / video_fps_rate)
+            v_category[(v > constants.FAST_MAX_SPEED)] = int(
+                utils.SprintCategory.VERY_FAST.value)-1
             player_ids.append(player.name)
             # Calculate minutes
-            minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
-            self.draw_player_info(i, j, axs_velocites, minutes, v, player, video_fps_rate, "Speed (m/s)")
-        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_dist), ax_sprint_category, "Distance (m)")
-        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(team_sprint_categories_count), ax_sprint_category_count, "Seconds (s)")
-        self.draw_scattered_total_distance_sprint_categories(player_ids, player_total_distances, pd.DataFrame.from_dict(team_sprint_categories_count))
+            minutes = np.array(list(player.all_positions.keys()))[
+                1:] / (video_fps_rate * 60)  # discard the first time sample
+            self.draw_player_info(
+                i, j, axs_velocites, minutes, v, player, video_fps_rate, "Speed (m/s)")
+        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(
+            team_sprint_categories_dist), ax_sprint_category, "Distance (m)")
+        self.draw_team_sprint_categories(player_ids, pd.DataFrame.from_dict(
+            team_sprint_categories_count), ax_sprint_category_count, "Seconds (s)")
+        self.draw_scattered_total_distance_sprint_categories(
+            player_ids, player_total_distances, pd.DataFrame.from_dict(team_sprint_categories_count))
         # Draw sprint category distribution
         sprint_durations = utils.extract_sequences(v_category)
-        sprint_categories = [utils.SprintCategory.WALKING, utils.SprintCategory.EASY, utils.SprintCategory.MODERATE, utils.SprintCategory.FAST, utils.SprintCategory.VERY_FAST]
+        sprint_categories = [utils.SprintCategory.WALKING, utils.SprintCategory.EASY,
+                             utils.SprintCategory.MODERATE, utils.SprintCategory.FAST, utils.SprintCategory.VERY_FAST]
         colors = ['tab:red', 'tab:blue', 'tab:green', 'tab:pink', 'tab:olive']
-        kwargs = dict(hist_kws={'alpha':.6}, kde_kws={'linewidth':2})
+        kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
         print(f"Number of sprint categories: {len(sprint_durations)}")
         for sprint_category, durations in sprint_durations.items():
-            durations = list(map(lambda frame: frame / video_fps_rate, durations))
+            durations = list(
+                map(lambda frame: frame / video_fps_rate, durations))
             avg = round(sum(durations) / len(durations), 2)
             print(sprint_categories[int(sprint_category)-1].name, avg)
-            sns.distplot(durations, color=colors[int(sprint_category)-1], label=sprint_categories[int(sprint_category)-1].name + " AVG: " + str(avg), ax=axs_duration, hist=False, **kwargs)
+            sns.distplot(durations, color=colors[int(sprint_category)-1], label=sprint_categories[int(
+                sprint_category)-1].name + " AVG: " + str(avg), ax=axs_duration, hist=False, **kwargs)
         # axs_duration.set_xlim(right=min(maxs))
         axs_duration.set_ylabel("Probability density")
         axs_duration.set_xlabel("Seconds")
         axs_duration.legend()
         plt.show()
-        
+
     def draw_team_acc_summary(self, pitch: pitch.Pitch, team: team.Team, video_fps_rate: int, window: int):
         # Setup acceleration plots
-        fig_acc, axs_acc = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
-        fig_acc.suptitle(f"Team {team.name} player accelerations", color="black", fontsize=30)
+        fig_acc, axs_acc = plt.subplots(
+            nrows=3, ncols=4, figsize=(16, 10), sharey=True)
+        fig_acc.suptitle(
+            f"Team {team.name} player accelerations", color="black", fontsize=30)
         fig_acc.delaxes(axs_acc[2][3])
         # Setup metabolic plot for players
-        fig_mc, axs_mc = plt.subplots(nrows=3, ncols=4, figsize=(16, 10), sharey=True)
-        fig_mc.suptitle(f"Team {team.name} player metabolic power", color="black", fontsize=30)
+        fig_mc, axs_mc = plt.subplots(
+            nrows=3, ncols=4, figsize=(16, 10), sharey=True)
+        fig_mc.suptitle(
+            f"Team {team.name} player metabolic power", color="black", fontsize=30)
         fig_mc.delaxes(axs_mc[2][3])
         # Data for storing
         player_ids = []
         player_total_distances = []
+        
         for ind, player in enumerate(team.players):
             # Indices
             i = ind // 4
             j = ind % 4
             # Speed calculation
-            v = self.estimate_player_speed(pitch, player, video_fps_rate, window)
+            v = self.estimate_player_speed(
+                pitch, player, video_fps_rate, window)
             player_total_distance = v.sum() / video_fps_rate
             player_total_distances.append(player_total_distance)
             # Acceleration
             acc = np.diff(v) * video_fps_rate
-            acc[acc > 6]  = np.nan
+            acc[acc > 6] = np.nan
             acc[acc < -6] = np.nan
             mcost = utils.metabolic_cost(acc)
             mpower = mcost*v[1:]
             player_ids.append(player.name)
-            minutes = np.array(list(player.all_positions.keys()))[1:] / (video_fps_rate * 60) # discard the first time sample
-            self.draw_player_info(i, j, axs_acc, minutes, acc, player, video_fps_rate, "Acc (m/s^2)")
-            self.draw_player_info(i, j, axs_mc, minutes, mpower, player, video_fps_rate, "Metabolic power (J / kg*s)")
+            minutes = np.array(list(player.all_positions.keys()))[
+                2:] / (video_fps_rate * 60)  # discard the first time sample
+            if minutes.size != acc.size:
+                print(f"Error in drawing, acceleration plot creation skipped...")
+                return
+            self.draw_player_info(i, j, axs_acc, minutes,
+                                  acc, player, video_fps_rate, "Acc (m/s^2)")
+            self.draw_player_info(i, j, axs_mc, minutes, mpower,
+                                  player, video_fps_rate, "Metabolic power (J / kg*s)")
         plt.show()
-        
+
     def show_match_acc_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
-        self.draw_team_acc_summary(pitch, match.team1, video_fps_rate, window) 
-        self.draw_team_acc_summary(pitch, match.team2, video_fps_rate, window) 
-    
+        self.draw_team_acc_summary(pitch, match.team1, video_fps_rate, window)
+        self.draw_team_acc_summary(pitch, match.team2, video_fps_rate, window)
+
     def show_match_sprint_summary(self, pitch: pitch.Pitch, match: match.Match, video_fps_rate: int, window: int):
         """Calculates speed of each player through the match. Takes into account fps rate of the original video and sampling period = windpw/
 
@@ -291,61 +347,74 @@ class AnalyticsViewer:
             video_fps_rate (int): Original video fps rate.
             window (int): Smoothing window size.
         """
-        self.draw_team_sprint_summary(pitch, match.team1, video_fps_rate, window)
-        self.draw_team_sprint_summary(pitch, match.team2, video_fps_rate, window)
-    
+        self.draw_team_sprint_summary(
+            pitch, match.team1, video_fps_rate, window)
+        self.draw_team_sprint_summary(
+            pitch, match.team2, video_fps_rate, window)
+
     def draw_player_heatmap(self, match: match.Match, pitch: pitch.Pitch, player_id: int):
         """Draws heatmap for the given player."""
         player = match.find_person_with_id(player_id)
         if player is None:
             print(f"The player with this id doesn't exist.")
             return
-        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 10), sharey=True)
+        fig, axs = plt.subplots(
+            nrows=1, ncols=2, figsize=(16, 10), sharey=True)
         fig.suptitle(f"{player.name}'s heat map", color="black", fontsize=30)
         draw_pitch = mplsoccer.pitch.Pitch(pitch_type='statsbomb', line_zorder=2,
-        pitch_color='#22312b', line_color='#efefef', pitch_length=105, pitch_width=68)
-        draw_pitch.draw(ax=axs[0], tight_layout=False, constrained_layout=True, figsize=(8, 5))
+                                           pitch_color='#22312b', line_color='#efefef', pitch_length=105, pitch_width=68)
+        draw_pitch.draw(ax=axs[0], tight_layout=False,
+                        constrained_layout=True, figsize=(8, 5))
         # Get positions
-        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, player.all_positions.values())
+        x_positions, y_positions = self.get_team_mplsoccer_positions(
+            pitch, player.all_positions.values())
         # Start drawing heatmap
-        bin_statistic = draw_pitch.bin_statistic(x_positions, y_positions, statistic='count', bins=(25, 25))
-        bin_statistic['statistic'] = gaussian_filter(bin_statistic['statistic'], 1)
-        pcm = draw_pitch.heatmap(bin_statistic, ax=axs[0], cmap='hot', edgecolors='#22312b')
+        bin_statistic = draw_pitch.bin_statistic(
+            x_positions, y_positions, statistic='count', bins=(25, 25))
+        bin_statistic['statistic'] = gaussian_filter(
+            bin_statistic['statistic'], 1)
+        pcm = draw_pitch.heatmap(
+            bin_statistic, ax=axs[0], cmap='hot', edgecolors='#22312b')
         # Add the colorbar and format off-white
         cbar = fig.colorbar(pcm, ax=axs[0], shrink=0.6)
         cbar.outline.set_edgecolor('#efefef')
         cbar.ax.yaxis.set_tick_params(color='#efefef')
         # Right plot
         flamingo_cmap = LinearSegmentedColormap.from_list("Flamingo - 100 colors",
-                                                  ['#e3aca7', '#c03a1d'], N=100)
+                                                          ['#e3aca7', '#c03a1d'], N=100)
         draw_pitch = mplsoccer.pitch.Pitch(pitch_type='statsbomb', line_zorder=2,
-        pitch_color='#22312b', line_color='#000009', pitch_length=105, pitch_width=68)
+                                           pitch_color='#22312b', line_color='#000009', pitch_length=105, pitch_width=68)
 
         draw_pitch.draw(ax=axs[1], figsize=(8, 5))
         draw_pitch.kdeplot(x_positions, y_positions, ax=axs[1],
-                    # fill using 100 levels so it looks smooth
-                    fill=True, levels=100,
-                    # shade the lowest area so it looks smooth
-                    # so even if there are no events it gets some color
-                    shade_lowest=True,
-                    cut=4,  # extended the cut so it reaches the bottom edge
-                    cmap=flamingo_cmap)
+                           # fill using 100 levels so it looks smooth
+                           fill=True, levels=100,
+                           # shade the lowest area so it looks smooth
+                           # so even if there are no events it gets some color
+                           shade_lowest=True,
+                           cut=4,  # extended the cut so it reaches the bottom edge
+                           cmap=flamingo_cmap)
         plt.show()
-    
+
     def draw_convex_hull_for_players(self, pitch: pitch.Pitch, team: team.Team, current_frame: int, left: bool):
         """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper is ignored.
         Left represents the side on which is the goalkeeper.
         """
         # Extract positons
-        positions = [player.current_position for player in team.players if player.last_seen_frame_id == current_frame]
-        team_ids = [player.name for player in team.players if player.last_seen_frame_id == current_frame]
-        x_positions, y_positions = self.get_team_mplsoccer_positions(pitch, positions)
+        positions = [
+            player.current_position for player in team.players if player.last_seen_frame_id == current_frame]
+        team_ids = [
+            player.name for player in team.players if player.last_seen_frame_id == current_frame]
+        x_positions, y_positions = self.get_team_mplsoccer_positions(
+            pitch, positions)
         if left:
             # Then the goalkeeper is on the left side so we should remove the min x player
-            index_to_remove = min(range(len(x_positions)), key=x_positions.__getitem__)
+            index_to_remove = min(range(len(x_positions)),
+                                  key=x_positions.__getitem__)
         else:
             # The goalkeeper is on the right side so we should remove the max x player
-            index_to_remove = max(range(len(x_positions)), key=x_positions.__getitem__)
+            index_to_remove = max(range(len(x_positions)),
+                                  key=x_positions.__getitem__)
         del x_positions[index_to_remove]
         del y_positions[index_to_remove]
         del team_ids[index_to_remove]
@@ -354,139 +423,197 @@ class AnalyticsViewer:
         fig, ax = pitch.draw(figsize=(8, 6))
         fig.suptitle(f"{team.name}'s convex hull", color="black", fontsize=30)
         hull = pitch.convexhull(x_positions, y_positions)
-        pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue', facecolor='cornflowerblue', alpha=0.3)
-        pitch.scatter(x_positions, y_positions, ax=ax, edgecolor='black', facecolor='cornflowerblue')
+        pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue',
+                      facecolor='cornflowerblue', alpha=0.3)
+        pitch.scatter(x_positions, y_positions, ax=ax,
+                      edgecolor='black', facecolor='cornflowerblue')
         for i, player_id in enumerate(team_ids):
-            ax.text(x_positions[i] + 1.5, y_positions[i] + 1.5, player_id, color="black")
+            ax.text(x_positions[i] + 1.5, y_positions[i] +
+                    1.5, player_id, color="black")
         plt.show()
-    
+
     def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
         """Visualizes last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
         # Drawing setup
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
         frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
-        fig.suptitle(f"Visualizing last {seconds_to_visualize} seconds", color="black", fontsize=30)
+        fig.suptitle(
+            f"Visualizing last {seconds_to_visualize} seconds", color="black", fontsize=30)
         frames_to_visualize_pad = frames_to_visualize + window - 1
         print(f"Frames to visualize: {frames_to_visualize}")
         # Setup markers to visualization
         # Assume that home is team1
         # Away is team2
-        marker_kwargs = {'marker': 'o', 'markeredgecolor': 'black', 'linestyle': 'None'}
-        home, = ax.plot([], [], ms=10, markerfacecolor="blue", **marker_kwargs)  # purple
+        marker_kwargs = {'marker': 'o',
+                         'markeredgecolor': 'black', 'linestyle': 'None'}
+        home, = ax.plot([], [], ms=10, markerfacecolor="blue",
+                        **marker_kwargs)  # purple
         away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
-        
-        team1_positions, team1_ids = match.team1.get_last_n_player_positions(frames_to_visualize_pad, window)
-        team2_positions, team2_ids = match.team2.get_last_n_player_positions(frames_to_visualize_pad, window)
+
+        team1_positions, team1_ids = match.team1.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
+        team2_positions, team2_ids = match.team2.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
 
         team1_text, team2_text = [], []
         for i in range(11):
             team1_text.append(ax.annotate(team1_ids[i], (0, 0), color="black"))
             team2_text.append(ax.annotate(team2_ids[i], (0, 0), color="black"))
-    
+
         def animate(frame):
             """Function used for animation. Sets data position for players."""
-            team1_positions_extracted = [player_positions[frame] for player_positions in team1_positions if frame < player_positions.shape[0]]
-            team2_positions_extracted = [player_positions[frame] for player_positions in team2_positions if frame < player_positions.shape[0]]
-            
-            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions_extracted)
-            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions_extracted)
-            
+            team1_positions_extracted = [player_positions[frame]
+                                         for player_positions in team1_positions if frame < player_positions.shape[0]]
+            team2_positions_extracted = [player_positions[frame]
+                                         for player_positions in team2_positions if frame < player_positions.shape[0]]
+
+            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team1_positions_extracted)
+            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team2_positions_extracted)
+
             home.set_data(team1_x_positions, team1_y_positions)
             away.set_data(team2_x_positions, team2_y_positions)
-            
+
             for i in range(11):
-                team1_text[i].set_position((team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
-                team2_text[i].set_position((team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
+                team1_text[i].set_position(
+                    (team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
+                team2_text[i].set_position(
+                    (team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
 
             return home, away, *team1_text, *team2_text
 
         # call the animator, animate so 25 frames per second
         # must not remove anim!
-        anim = animation.FuncAnimation(fig, animate, frames=frames_to_visualize, interval=25, blit=True)
+        anim = animation.FuncAnimation(
+            fig, animate, frames=frames_to_visualize, interval=25, blit=True)
         # anim.save("switch_positions.mp4")
-        plt.show() 
-    
+        plt.show()
+
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
         """Draws voronoi diagrams for the current match situation to see how well the space is covered for each player."""
         # Extract positions
-        team1_positions = [player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
-        team1_ids = [player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
-        team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(pitch, team1_positions)
-        team2_positions = [player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
-        team2_ids = [player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
-        team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(pitch, team2_positions)
+        team1_positions = [
+            player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_ids = [
+            player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+            pitch, team1_positions)
+        team2_positions = [
+            player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_ids = [
+            player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+            pitch, team2_positions)
         # Draw pitch
         draw_pitch = mplsoccer.pitch.Pitch()
-        fig, ax = draw_pitch.draw(figsize=(8, 6))
-        fig.suptitle(f"Voronoi diagrams", color="black", fontsize=30)
+        fig_voronoi, axs_voronoi = plt.subplots(
+            nrows=1, ncols=2, figsize=(16, 10))
+        draw_pitch.draw(figsize=(8, 6), ax=axs_voronoi[0])
+        fig_voronoi.suptitle(f"Voronoi diagrams", color="black", fontsize=30)
         # Plot Voronoi
         team1, team2 = draw_pitch.voronoi(team1_x_positions + team2_x_positions, team1_y_positions + team2_y_positions,
-                         [True for _ in range(len(team1_positions))] + [False for _ in range(len(team2_y_positions))])
-        draw_pitch.polygon(team1, ax=ax, fc='yellow', ec='black', lw=3, alpha=0.4)
-        draw_pitch.polygon(team2, ax=ax, fc='red', ec='black', lw=3, alpha=0.4)
+                                          [True for _ in range(len(team1_positions))] + [False for _ in range(len(team2_y_positions))])
+        # Draw bar plot for percentage of space covered
+        team1_areas = [Polygon(polygon).area for polygon in team1]
+        team2_areas = [Polygon(polygon).area for polygon in team2]
+        team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
+        team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
+        
+        axs_voronoi[1].bar([match.team1.name, match.team2.name], [team1_area_ratio, team2_area_ratio]) 
+        axs_voronoi[1].set_title("Percentage of space covered")
+        # Plot polygons
+        
+        draw_pitch.polygon(team1, ax=axs_voronoi[0], fc='yellow',
+                           ec='black', lw=3, alpha=0.4)
+        draw_pitch.polygon(team2, ax=axs_voronoi[0], fc='red', ec='black', lw=3, alpha=0.4)
         # Plot players
-        draw_pitch.scatter(team1_x_positions, team1_y_positions, c='yellow', s=80, ec='k', ax=ax)
+        draw_pitch.scatter(team1_x_positions, team1_y_positions,
+                           c='yellow', s=80, ec='k', ax=axs_voronoi[0])
         for i, player_id in enumerate(team1_ids):
-            ax.text(team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5, player_id, color="black")
-        draw_pitch.scatter(team2_x_positions, team2_y_positions, c='red', s=80, ec='k', ax=ax)
+            axs_voronoi[0].text(
+                team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5, player_id, color="black")
+        draw_pitch.scatter(team2_x_positions, team2_y_positions,
+                           c='red', s=80, ec='k', ax=axs_voronoi[0])
         for i, player_id in enumerate(team2_ids):
-            ax.text(team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5, player_id, color="black")
+            axs_voronoi[0].text(
+                team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5, player_id, color="black")
         plt.show()
-                
+
     def draw_delaunay_tessellation(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
         """Draws Delaunay Tessellation for a specific match situation. """
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
         # Extract positions
-        team1_positions = [player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
-        team1_ids = [player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
-        team2_positions = [player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
-        team2_ids = [player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team1_positions = [
+            player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_ids = [
+            player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team2_positions = [
+            player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_ids = [
+            player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
 
         global current_team
         current_team = match.team1
+
         def press(event):
             global current_team
             if event.key == "x":
                 plt.cla()
                 if current_team == match.team1:
                     current_team = match.team2
-                    fig.suptitle(f"Delaunay's tessellation of team {match.team2.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
+                    fig.suptitle(
+                        f"Delaunay's tessellation of team {match.team2.name}", color="black", fontsize=30)
+                    self.draw_positions_tessellation_helper(
+                        draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
                 elif current_team == match.team2:
                     current_team = "both"
-                    fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
+                    fig.suptitle(f"Delaunay's tessellation",
+                                 color="black", fontsize=30)
+                    self.draw_positions_tessellation_helper(
+                        draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+                    self.draw_positions_tessellation_helper(
+                        draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
                 else:
                     current_team = match.team1
-                    fig.suptitle(f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
-                    self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+                    fig.suptitle(
+                        f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
+                    self.draw_positions_tessellation_helper(
+                        draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
                 fig.canvas.draw()
 
         fig.canvas.mpl_connect('key_press_event', lambda event: press(event))
         current_team = "both"
         fig.suptitle(f"Delaunay's tessellation", color="black", fontsize=30)
         # TODO: change blue/red to some method
-        self.draw_positions_tessellation_helper(draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
-        self.draw_positions_tessellation_helper(draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
+        self.draw_positions_tessellation_helper(
+            draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+        self.draw_positions_tessellation_helper(
+            draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
         plt.show()
-        
+
     def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, team_ids: List, color, ax):
         """Helper method for tessellation."""
         draw_pitch.draw(figsize=(8, 6), ax=ax)
-        team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(pitch, team_positions)
-        draw_pitch.triplot(team_x_positions, team_y_positions, color=color, linewidth=2, ax=ax)
-        draw_pitch.scatter(team_x_positions, team_y_positions, color=color, s=150, zorder=10, ax=ax)
+        team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(
+            pitch, team_positions)
+        draw_pitch.triplot(team_x_positions, team_y_positions,
+                           color=color, linewidth=2, ax=ax)
+        draw_pitch.scatter(team_x_positions, team_y_positions,
+                           color=color, s=150, zorder=10, ax=ax)
         for i, player_id in enumerate(team_ids):
-            ax.text(team_x_positions[i] + 1.5, team_y_positions[i] + 1.5, player_id, color=color)
-        
+            ax.text(
+                team_x_positions[i] + 1.5, team_y_positions[i] + 1.5, player_id, color=color)
 
     def get_team_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
         """Helper method to extract team positions and transform them into the mplsoccer friendly format."""
-        team_positions: Tuple[float, float] = list(map(lambda position: pitch.normalize_pixel_position(position), team_positions))
-        team_x_positions = list(map(lambda position: position[0] * constants.MPLSOCCER_PITCH_LENGTH, team_positions))
-        team_y_positions = list(map(lambda position: position[1] * constants.MPLSOCCER_PITCH_WIDTH, team_positions))
+        team_positions: Tuple[float, float] = list(
+            map(lambda position: pitch.normalize_pixel_position(position), team_positions))
+        team_x_positions = list(map(
+            lambda position: position[0] * constants.MPLSOCCER_PITCH_LENGTH, team_positions))
+        team_y_positions = list(map(
+            lambda position: position[1] * constants.MPLSOCCER_PITCH_WIDTH, team_positions))
         return team_x_positions, team_y_positions
