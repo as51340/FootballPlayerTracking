@@ -1,7 +1,8 @@
 from typing import List, Tuple, Dict
 
+
 class Person:
-    
+
     def __init__(self, name: str, initial_id: int, initial_position: Tuple[float, float], initial_position_meters: Tuple[float, float]) -> None:
         """Referees and players will have initial_id. This is different from player's jersey number. All persons can have multiple ids -> those are ids given by the detection algorithm.
 
@@ -13,11 +14,14 @@ class Person:
         """
         self.name = name
         self.ids: List[int] = [initial_id]
-        self.current_position: Tuple[float, float] = initial_position  # in 2D space in pixels
+        # in 2D space in pixels
+        self.current_position: Tuple[float, float] = initial_position
         self.sum_pos_x, self.sum_pos_y = initial_position_meters  # in meters
         self.total_times_seen = 1
-        self.last_seen_frame_id = 2  # the first frame is removed because it is used for analytical purposes
-        self.all_positions: Dict[int, Tuple[float, float]] = {2: initial_position}  # in 2D space in pixels
+        # the first frame is removed because it is used for analytical purposes
+        self.last_seen_frame_id = 2
+        self.all_positions: Dict[int, Tuple[float, float]] = {
+            2: initial_position}  # in 2D space in pixels
 
     def update_person_position(self, new_position: Tuple[float, float], new_position_meters: Tuple[float, float], current_frame_id: int) -> None:
         """Updates person position.
@@ -34,13 +38,14 @@ class Person:
         self.all_positions[current_frame_id] = new_position
         self.total_times_seen += 1
         self.last_seen_frame_id = current_frame_id
-    
+
     @property
     def label(self) -> str:
         return ""
 
+
 class Referee(Person):
-    
+
     def __init__(self, name: str, initial_id: int, color: Tuple[int, int, int, int], initial_position: Tuple[int, int], initial_position_meters: Tuple[float, float]) -> None:
         """Initializes referee. By taking into the account coloring, referee is on the same level as Team.
         Args:
@@ -55,7 +60,7 @@ class Referee(Person):
 
 
 class Player(Person):
-    
+
     def __init__(self, name: str, jersey_number: int, initial_id: int, initial_position: Tuple[int, int], initial_position_meters: Tuple[float, float]) -> None:
         """Initializes player.
 
@@ -68,7 +73,7 @@ class Player(Person):
         """
         super().__init__(name, initial_id, initial_position, initial_position_meters)
         self.jersey_number = jersey_number
-    
+
     @property
     def label(self) -> str:
         return self.ids[0]

@@ -5,33 +5,36 @@ from collections import Counter
 
 from abc import abstractmethod, ABC
 
+
 class TeamClassificator(ABC):
-    
+
     @abstractmethod
-    def classify_persons_into_categories(self, detections: np.ndarray, max_height = -1, max_width = -1):
+    def classify_persons_into_categories(self, detections: np.ndarray, max_height=-1, max_width=-1):
         pass
-    
+
     def preprocess_detections(self, detections: np.ndarray):
         return detections.reshape(detections.shape[0], -1)
 
+
 class DBSCANTeamClassificator(TeamClassificator):
-    
+
     def __init__(self) -> None:
         self.alg = DBSCAN(eps=3, min_samples=2)
-    
+
     def classify_persons_into_categories(self, detections: np.ndarray, max_height=-1, max_width=-1):
         start_time = time.time()
         labels = self.alg.fit_predict(self.preprocess_detections(detections))
         print(f"Labels: {labels}")
         print(f"Fit and predict took: {time.time() - start_time:.2f}s")
         return labels
-    
+
+
 class KMeansTeamClassificator(TeamClassificator):
-    
+
     def __init__(self) -> None:
         self.alg = KMeans(n_clusters=3)
-    
-    def classify_persons_into_categories(self, detections: np.ndarray, max_height = -1, max_width = -1):
+
+    def classify_persons_into_categories(self, detections: np.ndarray, max_height=-1, max_width=-1):
         """Tries to classify objects into two teams and a referee using clustering algorithms.
 
         Args:
@@ -60,7 +63,7 @@ class KMeansTeamClassificator(TeamClassificator):
         print(f"Labels: {labels}")
         print(f"Fit and predict took: {time.time() - start_time:.2f}s")
         return labels
-        
+
 
 # def get_bounding_boxes(bb_info, video_frame):
 #     bboxes = []
@@ -80,7 +83,7 @@ class KMeansTeamClassificator(TeamClassificator):
 #         # print(f"l, u, r, d: {lpad} {upad} {rpad} {dpad}")
 #         bboxes[i] = np.pad(bbox, ((upad, dpad), (lpad, rpad), (0, 0)), mode="mean")
 #         # print(f"After padding shape: {bboxes[i].shape}")
-#         
+#
 #     bboxes = np.array(bboxes)
 #     #`` print(f"All boxes shape: {bboxes.shape}")
 #     return bboxes, max_height, max_width
@@ -89,12 +92,12 @@ class KMeansTeamClassificator(TeamClassificator):
 # Should have been used
 # def is_assistant_referee_positioned(pitch: Pitch, detection_x_coord: int, detection_y_coord: int) -> bool:
 #     """Checks whether the detection is positioned as a assistant referee. This can be side-line referee but also 4th behind the goal.
-# 
+#
 #     Args:
 #         pitch (Pitch): _description_
 #         detection_x_coord (int): _description_
 #         detection_y_coord (int): _description_
-# 
+#
 #     Returns:
 #         bool: true if it is positioned like the assistant referee could be positioned.
 #     """
@@ -112,4 +115,3 @@ class KMeansTeamClassificator(TeamClassificator):
 #         detection_y_coord >= pitch.down_left_corner[1] - config.ASSISTANT_REFEREE_PIXEL_TOLERANCE and detection_y_coord <= pitch.down_left_corner[1] + config.ASSISTANT_REFEREE_PIXEL_TOLERANCE:
 #             return True  # down sideline check
 #     return False
-

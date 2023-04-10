@@ -39,6 +39,7 @@ def get_file_name(path: str) -> str:
     last_dot = path.rfind('.')
     return path[last_slash + 1:last_dot]
 
+
 def squash_detections(path_to_detections: str, H: np.ndarray):
     """Squashes detections from the bounding box to the one point and transforms them using the homography matrix.
     Args:
@@ -85,9 +86,11 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
             f"Reading: {frame_id} frames took: {(time.time() - start_time):.2f}s")
         return storage
 
+
 def check_kill(k):
     if k == ord('k'):
         os._exit(-1)
+
 
 def pause():
     while True:
@@ -97,11 +100,14 @@ def pause():
         if k == ord('p') or globals.stop_thread:
             break
 
+
 def to_tuple_int(coords: Tuple) -> Tuple[int, int]:
     return int(coords[0]), int(coords[1])
 
+
 def to_tuple_float(coords: Tuple) -> Tuple[float, float]:
     return float(coords[0]), float(coords[1])
+
 
 def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
     unseen_frames = []
@@ -110,11 +116,14 @@ def count_not_seen_players(match_, missing_ids: List[int], frame_id: int):
             frame_id - match_.find_person_with_id(missing_id).last_seen_frame_id)
     return unseen_frames
 
+
 def calculate_euclidean_distance(current_position: Tuple[float, float], new_position: Tuple[float, float]):
     return math.sqrt((current_position[0] - new_position[0])**2 + (current_position[1] - new_position[1])**2)
 
+
 def convert_frame_to_minutes(frame, fps_rate):
     return frame / (fps_rate * 60.0)
+
 
 def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
     """This method returns information about all objects that don't need to be resolved and about which we already have some information.
@@ -136,15 +145,18 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
             existing_objects_ids.append(object_ids_in_pitch[i])
     return existing_objects_detections, existing_objects_bb_info, existing_objects_ids
 
+
 def metabolic_cost(acc: np.array):
     """Calculates metabolic cost from provided accelerations.
-    """ 
+    """
     cost = np.zeros_like(acc)
     for i in range(acc.size):
         if acc[i] > 0:
-            cost[i] = 0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * (4.03 * acc[i] + 3.6 * np.exp(-0.408 * acc[i]))
+            cost[i] = 0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * \
+                (4.03 * acc[i] + 3.6 * np.exp(-0.408 * acc[i]))
         elif acc[i] < 0:
-            cost[i] =  0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * (-0.85 * acc[i] + 3.6 * np.exp(1.33 * acc[i]))
+            cost[i] = 0.102 * ((acc[i] ** 2 + 96.2) ** 0.5) * \
+                (-0.85 * acc[i] + 3.6 * np.exp(1.33 * acc[i]))
         else:
             acc[i] = 0.0
     return cost
@@ -165,4 +177,3 @@ def extract_sequences(arr: np.array) -> pd.DataFrame:
     for seq in sequences:
         data[seq[0]].append(len(seq))
     return data
-    

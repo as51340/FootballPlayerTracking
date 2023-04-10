@@ -18,8 +18,8 @@ FPS_ANIMATIONS = 25
 # Speeds
 MAX_SPEED = 11.5  # in m/s
 SMOOTHING_AVG_WINDOW = 7  # for velocities
-POSITION_SMOOTHING_AVG_WINDOW = 5 # for positions when drawing animation
+POSITION_SMOOTHING_AVG_WINDOW = 5  # for positions when drawing animation
 WALKING_MAX_SPEED = 1.9444  # 7 km/h
 EASY_MAX_SPEED = 3.8889  # 7-14 km/h
-MODERATE_MAX_SPEED = 5.2778 # 14-20 km/h
+MODERATE_MAX_SPEED = 5.2778  # 14-20 km/h
 FAST_MAX_SPEED = 6.944  # 20-25 km/h

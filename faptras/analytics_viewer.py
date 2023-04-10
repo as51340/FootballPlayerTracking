@@ -306,7 +306,7 @@ class AnalyticsViewer:
         # Data for storing
         player_ids = []
         player_total_distances = []
-        
+
         for ind, player in enumerate(team.players):
             # Indices
             i = ind // 4
@@ -445,8 +445,7 @@ class AnalyticsViewer:
         # Setup markers to visualization
         # Assume that home is team1
         # Away is team2
-        marker_kwargs = {'marker': 'o',
-                         'markeredgecolor': 'black', 'linestyle': 'None'}
+        marker_kwargs = {'marker': 'o', 'markeredgecolor': 'black', 'linestyle': 'None'}
         home, = ax.plot([], [], ms=10, markerfacecolor="blue",
                         **marker_kwargs)  # purple
         away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
@@ -491,6 +490,100 @@ class AnalyticsViewer:
         # anim.save("switch_positions.mp4")
         plt.show()
 
+    def draw_dynamic_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
+        """Draws pitch control for the last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
+        fig_voronoi, axs_voronoi = plt.subplots(
+            nrows=1, ncols=2, figsize=(16, 10))
+        draw_pitch = mplsoccer.pitch.Pitch()
+        draw_pitch.draw(figsize=(8, 6), ax=axs_voronoi[0])
+        fig_voronoi.suptitle(f"Voronoi diagrams", color="black", fontsize=30)
+
+        frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
+        frames_to_visualize_pad = frames_to_visualize + window - 1
+        fig_voronoi.suptitle(
+            f"Visualizing last {seconds_to_visualize} seconds", color="black", fontsize=30)
+
+        team1_positions, team1_ids = match.team1.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
+        team2_positions, team2_ids = match.team2.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
+
+        # Prepare text plots
+        team1_text, team2_text = [], []
+        for i in range(11):
+            team1_text.append(axs_voronoi[0].annotate(
+                team1_ids[i], (0, 0), color="black"))
+            team2_text.append(axs_voronoi[0].annotate(
+                team2_ids[i], (0, 0), color="black"))
+        # Prepare scatter plot
+        marker_kwargs = {'marker': 'o', 'markeredgecolor': 'black', 'linestyle': 'None'}
+        scatter_team_1, = axs_voronoi[0].plot(
+            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
+        scatter_team_2, = axs_voronoi[0].plot(
+            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
+        # Prepare polygons
+        draw_pitch.polygon([], ax=axs_voronoi[0], fc='yellow',
+                                             ec='black', lw=3, alpha=0.4)
+        draw_pitch.polygon([], ax=axs_voronoi[0], fc='red',
+                                             ec='black', lw=3, alpha=0.4)
+        # Prepare ratio of area covered
+        axs_voronoi[1].bar([match.team1.name, match.team2.name], [0.5, 0.5])
+        axs_voronoi[1].set_ylim([0, 1])
+        axs_voronoi[1].set_title("Percentage of space covered")
+
+        def animate(frame):
+            for patch in axs_voronoi[0].collections:
+                patch.remove()
+            for line in axs_voronoi[0].lines:
+                line.remove()
+            # Extract positions
+            team1_positions_extracted = [player_positions[frame]
+                                         for player_positions in team1_positions if frame < player_positions.shape[0]]
+            team2_positions_extracted = [player_positions[frame]
+                                         for player_positions in team2_positions if frame < player_positions.shape[0]]
+            # Extract x and y positions
+            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team1_positions_extracted)
+            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team2_positions_extracted)
+            # Calculate voronoi polygons
+            team1, team2 = draw_pitch.voronoi(team1_x_positions + team2_x_positions, team1_y_positions + team2_y_positions,
+                                              [True for _ in range(len(team1_positions))] + [False for _ in range(len(team2_y_positions))])
+            # Update scatter plot
+            scatter_team_1.set_data(team1_x_positions, team1_y_positions)
+            scatter_team_2.set_data(team2_x_positions, team2_y_positions)
+            # Update text
+            for i in range(11):
+                team1_text[i].set_position(
+                    (team1_x_positions[i] + 1, team1_y_positions[i] + 1))
+                team2_text[i].set_position(
+                    (team2_x_positions[i] + 1, team2_y_positions[i] + 1))
+            # Update polygons
+            for team1_polygon in team1:
+                axs_voronoi[0].fill(*zip(*team1_polygon), 'yellow')
+                axs_voronoi[0].plot(*zip(*team1_polygon), 'black', lw=1)
+            for team2_polygon in team2:
+                axs_voronoi[0].fill(*zip(*team2_polygon), 'red')
+                axs_voronoi[0].plot(*zip(*team2_polygon), 'black', lw=1)
+            
+            axs_voronoi[0].plot(team1_x_positions, team1_y_positions, ms=6, markerfacecolor='black', **marker_kwargs)
+            axs_voronoi[0].plot(team2_x_positions, team2_y_positions, ms=6, markerfacecolor='black', **marker_kwargs)
+            
+            # Update ratio of area covered 
+            team1_areas = [Polygon(polygon).area for polygon in team1]
+            team2_areas = [Polygon(polygon).area for polygon in team2]
+            team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
+            team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
+            ratios = [team1_area_ratio, team2_area_ratio]
+            for i, rect in enumerate(axs_voronoi[1].patches):
+                rect.set_height(ratios[i])
+            return axs_voronoi[0], axs_voronoi[1], *team1_text, *team2_text
+
+        anim = animation.FuncAnimation(
+            fig_voronoi, animate, frames=frames_to_visualize, interval=10)
+        anim.save(f"voronoi_diagrams.mp4", fps=constants.FPS_ANIMATIONS)
+        # plt.show()
+
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
         """Draws voronoi diagrams for the current match situation to see how well the space is covered for each player."""
         # Extract positions
@@ -518,16 +611,19 @@ class AnalyticsViewer:
         # Draw bar plot for percentage of space covered
         team1_areas = [Polygon(polygon).area for polygon in team1]
         team2_areas = [Polygon(polygon).area for polygon in team2]
-        team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
-        team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
-        
-        axs_voronoi[1].bar([match.team1.name, match.team2.name], [team1_area_ratio, team2_area_ratio]) 
+        team1_area_ratio = sum(team1_areas) / \
+            (sum(team1_areas) + sum(team2_areas))
+        team2_area_ratio = sum(team2_areas) / \
+            (sum(team1_areas) + sum(team2_areas))
+
+        axs_voronoi[1].bar([match.team1.name, match.team2.name], [
+                           team1_area_ratio, team2_area_ratio])
         axs_voronoi[1].set_title("Percentage of space covered")
         # Plot polygons
-        
         draw_pitch.polygon(team1, ax=axs_voronoi[0], fc='yellow',
                            ec='black', lw=3, alpha=0.4)
-        draw_pitch.polygon(team2, ax=axs_voronoi[0], fc='red', ec='black', lw=3, alpha=0.4)
+        draw_pitch.polygon(
+            team2, ax=axs_voronoi[0], fc='red', ec='black', lw=3, alpha=0.4)
         # Plot players
         draw_pitch.scatter(team1_x_positions, team1_y_positions,
                            c='yellow', s=80, ec='k', ax=axs_voronoi[0])

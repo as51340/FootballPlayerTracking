@@ -5,8 +5,9 @@ import utils
 import globals
 import time
 
+
 class ThreadWithReturnValue(Thread):
-    
+
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs={}, Verbose=None):
         Thread.__init__(self, group, target, name, args, kwargs)
@@ -15,11 +16,11 @@ class ThreadWithReturnValue(Thread):
         self.scheduled = False
         self.running = True
         self.start()
-        
+
     def set_execution_config(self, prompt: str):
         self.prompt = prompt
         self.scheduled = True
-        
+
     def run(self):
         while self.running:
             if self.scheduled:

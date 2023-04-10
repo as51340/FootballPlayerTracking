@@ -10,10 +10,10 @@ PitchOrientation = Enum('PitchOrientation', ['LENGTH', 'WIDTH'])
 
 
 class Pitch:
-    
-    def __init__(self, img_path, upper_left_corner: Tuple[int, int], down_left_corner: Tuple[int, int], down_right_corner: Tuple[int, int], 
+
+    def __init__(self, img_path, upper_left_corner: Tuple[int, int], down_left_corner: Tuple[int, int], down_right_corner: Tuple[int, int],
                  upper_right_corner: Tuple[int, int], pitch_length: int, pitch_width: int) -> None:
-        self.img_path = img_path # don't save image because we need multiple copies of this img
+        self.img_path = img_path  # don't save image because we need multiple copies of this img
         self.upper_left_corner = upper_left_corner
         self.down_left_corner = down_left_corner
         self.down_right_corner = down_right_corner
@@ -29,7 +29,7 @@ class Pitch:
             self.length, self.width = y_value, x_value  # pixels
         self.pitch_length = pitch_length  # in meters
         self.pitch_width = pitch_width  # in meters
-    
+
     def __repr__(self) -> str:
         s = f"UP_LEFT: {self.upper_left_corner} DOWN_LEFT: {self.down_left_corner} DOWN_RIGHT: {self.down_right_corner} UPPER_RIGHT: {self.upper_right_corner}\n"
         s += f"length: {self.length} width: {self.width}\n"
@@ -50,8 +50,8 @@ class Pitch:
         """
         if self.x_dim == PitchOrientation.LENGTH:
             return (pixel_coords[0] - self.upper_left_corner[0]) / self.length, (pixel_coords[1] - self.upper_left_corner[1]) / self.width
-        return (pixel_coords[0] - self.upper_left_corner[0]) / self.width,(pixel_coords[1] - self.upper_left_corner[1]) / self.length
-    
+        return (pixel_coords[0] - self.upper_left_corner[0]) / self.width, (pixel_coords[1] - self.upper_left_corner[1]) / self.length
+
     def pixel_to_meters_positions(self, pixel_coords: Tuple[int, int]) -> Tuple[float, float]:
         """Computes object's position in real-world (meter) coordinates from pixel positions/
 
@@ -63,8 +63,8 @@ class Pitch:
         """
         if self.x_dim == PitchOrientation.LENGTH:
             return (pixel_coords[0] - self.upper_left_corner[0]) * self.pitch_length / self.length, (pixel_coords[1] - self.upper_left_corner[1]) * self.pitch_width / self.width
-        return (pixel_coords[0] - self.upper_left_corner[0]) * self.pitch_width / self.width, (pixel_coords[1] - self.upper_left_corner[1])  * self.pitch_length / self.length
-    
+        return (pixel_coords[0] - self.upper_left_corner[0]) * self.pitch_width / self.width, (pixel_coords[1] - self.upper_left_corner[1]) * self.pitch_length / self.length
+
     @classmethod
     def load_pitch(cls, pitch_path: str, pitch_length: int, pitch_width: int) -> Pitch:
         """Creates pitch from given information.
@@ -87,7 +87,7 @@ class Pitch:
                 if pitch_data[0] == pitch_name:
                     return Pitch(pitch_path, *(map(lambda tup_str: literal_eval(tup_str), pitch_data[1:])), pitch_length, pitch_width)
         return None
-    
+
     def is_detection_outside(self, detection_x_coord: int, detection_y_coord: int) -> bool:
         """Checks whether the detection is outside of the pitch.
 
@@ -100,7 +100,7 @@ class Pitch:
             bool: true if it is outside of the pitch.
         """
         if detection_x_coord < self.upper_left_corner[0] or detection_y_coord < self.upper_left_corner[1] or \
-            detection_x_coord > self.upper_right_corner[0] or detection_y_coord > self.down_right_corner[1]:
+                detection_x_coord > self.upper_right_corner[0] or detection_y_coord > self.down_right_corner[1]:
             return True
         return False
 
@@ -122,7 +122,9 @@ class Pitch:
                 bb_info_ids.append(bb_info[i])
                 object_ids_in_pitch.append(objects_id[i])
         return detections_in_pitch, bb_info_ids, object_ids_in_pitch
-    
+
+
 if __name__ == "__main__":
-    pitch = Pitch.load_pitch("./pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg")
+    pitch = Pitch.load_pitch(
+        "./pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg")
     print(pitch)

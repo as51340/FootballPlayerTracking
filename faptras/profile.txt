@@ -1,0 +1,6 @@
+Using cached homography matrix...
+H: [[ 4.75536512e-01  1.31382729e+00 -5.28345743e+02]
+ [ 3.14160647e-03  2.80055481e+00 -2.40525903e+02]
+ [ 7.92212060e-06  5.40965804e-03  1.00000000e+00]]
+Reading: 7513 frames took: 1.96s
+Using cached initial settings.
