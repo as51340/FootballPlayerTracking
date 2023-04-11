@@ -133,7 +133,8 @@ class AnalyticsViewer:
                     min_dist = dist
         return min_dist
      
-    def show_distance_between_players(self, pitch: pitch.Pitch, match: match.Match, seconds_to_visualize: int, video_fps_rate: int, window: int) -> List[Tuple[float, float]]:
+    def dynamic_pitch_control(self, pitch: pitch.Pitch, match: match.Match, seconds_to_visualize: int, video_fps_rate: int, window: int) -> List[Tuple[float, float]]:
+        draw_pitch = mplsoccer.pitch.Pitch()
         frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
         frames_to_visualize_pad = frames_to_visualize + window - 1
         team1_positions, _ = match.team1.get_last_n_player_positions(
@@ -141,32 +142,57 @@ class AnalyticsViewer:
         team2_positions, _ = match.team2.get_last_n_player_positions(
             frames_to_visualize_pad, window)
         team1_min_distances, team2_min_distances = [], []
-        for frame in range(frames_to_visualize_pad):
+        team1_pitch_area, team2_pitch_area = [], []
+        for frame in range(frames_to_visualize):
             team1_positions_extracted = [player_positions[frame]
                                          for player_positions in team1_positions if frame < player_positions.shape[0]]
             team2_positions_extracted = [player_positions[frame]
                                          for player_positions in team2_positions if frame < player_positions.shape[0]]
+            # Get Voronoi polygons
+            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team1_positions_extracted)
+            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+                pitch, team2_positions_extracted)
+            team1, team2 = draw_pitch.voronoi(team1_x_positions + team2_x_positions, team1_y_positions + team2_y_positions,
+                                              [True for _ in range(len(team1_positions_extracted))] + [False for _ in range(len(team2_positions_extracted))])
+            team1_areas = [Polygon(polygon).area for polygon in team1]
+            team2_areas = [Polygon(polygon).area for polygon in team2]
+            team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
+            team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
+            team1_pitch_area.append(team1_area_ratio)
+            team2_pitch_area.append(team2_area_ratio)
             if len(team1_positions_extracted) != 11 or len(team2_positions_extracted) != 11:
                 team1_min_distances.append(team1_min_distances[-1])
                 team2_min_distances.append(team2_min_distances[-1])
-                continue
-            team1_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
-                position), team1_positions_extracted))
-            team2_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
-                position), team2_positions_extracted))
-            team1_min_distances.append(self.calculate_nearest_teammate_distance(team1_positions_extracted_meters))
-            team2_min_distances.append(self.calculate_nearest_teammate_distance(team2_positions_extracted_meters))
-        _, ax = plt.subplots(nrows=1, ncols=1, figsize=(16, 10))
-        minutes = np.arange(frames_to_visualize_pad)/ (video_fps_rate * 60)  # discard the first time sample
+            else:
+                team1_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
+                    position), team1_positions_extracted))
+                team2_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
+                    position), team2_positions_extracted))
+                team1_min_distances.append(self.calculate_nearest_teammate_distance(team1_positions_extracted_meters))
+                team2_min_distances.append(self.calculate_nearest_teammate_distance(team2_positions_extracted_meters))
+                        
+        _, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 10))
+        minutes = np.arange(frames_to_visualize)/ (video_fps_rate * 60)  # discard the first time sample
         minutes = minutes[::10]
         team1_min_distances = team1_min_distances[::10]
         team2_min_distances = team2_min_distances[::10]
-        ax.plot(minutes, team1_min_distances, label=match.team1.name)
-        ax.plot(minutes, team2_min_distances, label=match.team2.name)
-        ax.set_xlabel("Minutes")
-        ax.set_ylabel("Nearest teammate distance in meters")
-        ax.set_title("Nearest teammate distance comparison")
-        ax.legend()
+        team1_pitch_area = team1_pitch_area[::10]
+        team2_pitch_area = team2_pitch_area[::10]
+        # Plot min distances for both teams
+        axs[0].plot(minutes, team1_min_distances, label=match.team1.name)
+        axs[0].plot(minutes, team2_min_distances, label=match.team2.name)
+        axs[0].set_xlabel("Minutes")
+        axs[0].set_ylabel("Nearest teammate distance in meters")
+        axs[0].set_title("Nearest teammate distance comparison")
+        axs[0].legend()
+        # Plot pitch control for both teams
+        axs[1].plot(minutes, team1_pitch_area, label=match.team1.name)
+        axs[1].plot(minutes, team2_pitch_area, label=match.team2.name)
+        axs[1].set_xlabel("Minutes")
+        axs[1].set_ylabel("Area ratio")
+        axs[1].set_title("Area ratio comparison")
+        axs[1].legend()
         plt.show()
 
     def draw_player_info(self, i: int, j: int, axs, minutes: np.array, data: np.array, player: person.Player, video_fps_rate: int, y_label: str):
