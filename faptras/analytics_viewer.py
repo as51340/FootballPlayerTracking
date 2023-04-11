@@ -13,6 +13,7 @@ import mplsoccer
 import numpy as np
 import pandas as pd
 from time import time
+import sys
 
 import match
 import person
@@ -20,6 +21,7 @@ import utils
 import pitch
 import team
 import constants
+
 
 
 class AnalyticsViewer:
@@ -118,6 +120,53 @@ class AnalyticsViewer:
         axs[1].set_xticks(team2_ind)
         axs[1].set_xticklabels(team2_players_id, rotation=65)
         axs[1].bar_label(team2_plot)
+        plt.show()
+       
+    def calculate_nearest_teammate_distance(self, team_positions: List[Tuple[float, float]]):
+        min_dist = None
+        for i in range(len(team_positions)):
+            for j in range(len(team_positions)):
+                if i == j:
+                    continue
+                dist = np.sqrt(abs(team_positions[i][0] - team_positions[j][0])**2 + abs(team_positions[i][1] - team_positions[j][1])**2)
+                if min_dist is None or dist < min_dist:
+                    min_dist = dist
+        return min_dist
+     
+    def show_distance_between_players(self, pitch: pitch.Pitch, match: match.Match, seconds_to_visualize: int, video_fps_rate: int, window: int) -> List[Tuple[float, float]]:
+        frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
+        frames_to_visualize_pad = frames_to_visualize + window - 1
+        team1_positions, _ = match.team1.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
+        team2_positions, _ = match.team2.get_last_n_player_positions(
+            frames_to_visualize_pad, window)
+        team1_min_distances, team2_min_distances = [], []
+        for frame in range(frames_to_visualize_pad):
+            team1_positions_extracted = [player_positions[frame]
+                                         for player_positions in team1_positions if frame < player_positions.shape[0]]
+            team2_positions_extracted = [player_positions[frame]
+                                         for player_positions in team2_positions if frame < player_positions.shape[0]]
+            if len(team1_positions_extracted) != 11 or len(team2_positions_extracted) != 11:
+                team1_min_distances.append(team1_min_distances[-1])
+                team2_min_distances.append(team2_min_distances[-1])
+                continue
+            team1_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
+                position), team1_positions_extracted))
+            team2_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
+                position), team2_positions_extracted))
+            team1_min_distances.append(self.calculate_nearest_teammate_distance(team1_positions_extracted_meters))
+            team2_min_distances.append(self.calculate_nearest_teammate_distance(team2_positions_extracted_meters))
+        _, ax = plt.subplots(nrows=1, ncols=1, figsize=(16, 10))
+        minutes = np.arange(frames_to_visualize_pad)/ (video_fps_rate * 60)  # discard the first time sample
+        minutes = minutes[::10]
+        team1_min_distances = team1_min_distances[::10]
+        team2_min_distances = team2_min_distances[::10]
+        ax.plot(minutes, team1_min_distances, label=match.team1.name)
+        ax.plot(minutes, team2_min_distances, label=match.team2.name)
+        ax.set_xlabel("Minutes")
+        ax.set_ylabel("Nearest teammate distance in meters")
+        ax.set_title("Nearest teammate distance comparison")
+        ax.legend()
         plt.show()
 
     def draw_player_info(self, i: int, j: int, axs, minutes: np.array, data: np.array, player: person.Player, video_fps_rate: int, y_label: str):

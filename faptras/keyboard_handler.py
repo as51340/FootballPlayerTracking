@@ -61,6 +61,9 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     elif k == ord('d'):  # delaunay tessellation
         forward_analytics_call(
             analytics_display.draw_delaunay_tessellation, match, pitch, frame_id)
+    elif k == ord('e'):
+        forward_analytics_call(analytics_display.show_distance_between_players, pitch, match, min(
+            120, int(frame_id / fps_rate)), fps_rate, constants.POSITION_SMOOTHING_AVG_WINDOW)
     elif k == ord('f'):
         view.switch_screen_mode()  # Switch between normal and full mode
     elif k == ord('h'):  # heat map for each player
@@ -90,7 +93,7 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     elif k == ord('u'):  # dynamic voronoi diagrams
         forward_analytics_call(
             analytics_display.draw_dynamic_voronoi_diagrams, match, pitch, min(
-            10, int(frame_id / fps_rate)), constants.POSITION_SMOOTHING_AVG_WINDOW)
+                10, int(frame_id / fps_rate)), constants.POSITION_SMOOTHING_AVG_WINDOW)
     elif k == ord('v'):  # voronoi diagrams
         forward_analytics_call(
             analytics_display.draw_voronoi_diagrams, match, pitch, frame_id)
