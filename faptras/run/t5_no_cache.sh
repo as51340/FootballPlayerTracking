@@ -1,0 +1,1 @@
+python ../analyser.py --workdir ../workdir --video-path ../../data/t5.mp4 --detections-path ../../results/track/exp16/tracks/t5.txt --pitch-path ../pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg

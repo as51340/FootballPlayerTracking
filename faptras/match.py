@@ -24,6 +24,7 @@ class Match:
         """
         self.team1 = Team(team1_name, constants.BLUE)  # team1 is left
         self.team2 = Team(team2_name, constants.RED)  # team2 is red
+        self.referee = None
         # IDS that are ignored. They get added into this data structure from the user's side, e.g. assistant referee or any other object that user doesn't want to track anymore.
         self.ignore_ids = []
         # initial ids in the match. Needed for automatic AI resolver.
@@ -38,7 +39,7 @@ class Match:
         Returns:
             Player: None if the player doesn't exist, else a reference to the existing player.
         """
-        if id in self.referee.ids:
+        if self.referee is not None and id in self.referee.ids:
             return self.referee
         return self.find_player_with_id(id)
 
@@ -67,7 +68,7 @@ class Match:
         """
         team1_player = self.team1.get_player(input_id)
         team2_player = self.team2.get_player(input_id)
-        if input_id in self.referee.ids:
+        if self.referee is not None and input_id in self.referee.ids:
             return self.referee, self.referee.color, str(input_id)
         elif team1_player is not None:
             return team1_player, self.team1.color, str(team1_player.label)

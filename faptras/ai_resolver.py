@@ -80,7 +80,7 @@ class Resolver:
 
         unresolved_starting_ids: List[int] = missing_ids_from_start.copy()
 
-        # Not iterate over all new objects
+        # Now iterate over all new objects
         for j in range(len(new_objects_id)):
             # Filter out those that are too fast
             distances: List[float] = []
@@ -88,8 +88,8 @@ class Resolver:
             possible_indices: List[int] = []
             min_dist, min_ind, min_avg_dist, min_avg_ind = None, None, None, None
             for i in range(len(missing_ids_from_start)):
-                # ignore less than 0.2s
-                if missing_persons_time_passed[i] < 0.2:
+                # ignore less than 0.01s
+                if missing_persons_time_passed[i] < 0.01:
                     print(
                         f"Ignoring calculation for player {missing_ids_from_start[i]} and new player {new_objects_id[j]} because of too short time passed: {missing_persons_time_passed[i]:.2f}s.")
                 elif missing_persons_time_passed[i] > 5:
@@ -97,7 +97,7 @@ class Resolver:
                         f"Ignoring calculation for player {missing_ids_from_start[i]} and new player {new_objects_id[j]} because of too long time passed: {missing_persons_time_passed[i]:.2f}s.")
                 else:
                     dist_meters = utils.calculate_euclidean_distance(
-                        missing_persons[i].current_position, pitch_.pixel_to_meters_positions(new_objects_detection[j]))
+                        pitch_.pixel_to_meters_positions(missing_persons[i].current_position), pitch_.pixel_to_meters_positions(new_objects_detection[j]))
                     speed = dist_meters / missing_persons_time_passed[i]
                     if speed > constants.MAX_SPEED:
                         print(f"Player {missing_ids_from_start[i]} is certainly not {new_objects_id[j]} because he would have to run with {speed:.2f} m/s "

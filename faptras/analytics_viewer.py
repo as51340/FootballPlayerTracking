@@ -656,8 +656,8 @@ class AnalyticsViewer:
 
         anim = animation.FuncAnimation(
             fig_voronoi, animate, frames=frames_to_visualize, interval=10)
-        anim.save(f"voronoi_diagrams.mp4", fps=constants.FPS_ANIMATIONS)
-        # plt.show()
+        # anim.save(f"voronoi_diagrams.mp4", fps=constants.FPS_ANIMATIONS)
+        plt.show()
 
     def draw_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
         """Draws voronoi diagrams for the current match situation to see how well the space is covered for each player."""

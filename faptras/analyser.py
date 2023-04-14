@@ -30,9 +30,10 @@ VisualizationMode = Enum("VisualizationMode", ["PLAY", "SKIP"])
 
 
 def end_visualizations(game_situations: GameSituations, writer_det, writer_orig):
-    game_situations.video.release()
+    # game_situations.video.release()
     # writer_det.release()
     # writer_orig.release()
+    pass
 
 
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture,
