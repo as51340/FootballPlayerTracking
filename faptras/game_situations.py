@@ -10,9 +10,13 @@ class GameSituations:
         self.situation_mode = SituationMode.NO_SAVE
         fourcc = cv.VideoWriter_fourcc(*'mp4v') 
         self.video = cv.VideoWriter('game_situations.mp4', fourcc, fps_rate, (width, height))
+        self.needs_release = False
 
     def needs_saving(self):
-        return self.situation_mode == SituationMode.SAVE
+        if self.situation_mode == SituationMode.SAVE:
+            self.needs_release = True
+            return True
+        return False
     
     def switch_mode(self):
         if self.situation_mode == SituationMode.NO_SAVE:

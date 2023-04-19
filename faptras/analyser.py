@@ -29,15 +29,17 @@ prompter = thread_prompter.ThreadWithReturnValue()
 VisualizationMode = Enum("VisualizationMode", ["PLAY", "SKIP"])
 
 
-def end_visualizations(game_situations: GameSituations, writer_det, writer_orig):
-    # game_situations.video.release()
-    # writer_det.release()
-    # writer_orig.release()
+def end_visualizations(game_situations: GameSituations, writer_det, writer_orig, save_video: bool):
+    if game_situations.needs_release:
+        game_situations.video.release()
+    if save_video:
+        writer_det.release()
+        writer_orig.release()
     pass
 
 
 def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture,
-                        fps_rate: int, writer_orig, writer_det, game_situations: GameSituations, resolving_positions_cache: dict = None):
+                        fps_rate: int, writer_orig, writer_det, game_situations: GameSituations, save_video: bool, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
@@ -47,6 +49,11 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         pitch_img (_type_): A reference to the 2D pitch image.
         detections_vid_capture (_type_): Reference to the original video.
         fps_rate (int): FPS of the original video.
+        writer_orig (_type_): A reference to the video writer for the original video.
+        writer_det (_type_): A reference to the video writer for the 2D pitch video.
+        game_situations (GameSituations): A reference to the game situations object.
+        save_video (bool): Whether to save the video. If False, writer_orig and writer_det will be None.
+        resolving_positions_cache (dict, optional): A reference to the resolving positions cache. Defaults to None.
 
     Returns:
         status, resolving_cache: if status is True it means that visualization should be stopped. Resolving cache is dict. If None is given, cache will be filled and
@@ -179,8 +186,9 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             cv.imshow(constants.VIDEO_WINDOW, video_frame)
 
         resolve_helper.storage.append(frame_img_det)
-        # writer_det.write(frame_img_det)
-        # writer_orig.write(video_frame)
+        if save_video:
+            writer_det.write(frame_img_det)
+            writer_orig.write(video_frame)
         # Check whether we need to save some frame to the video
         if game_situations.needs_saving():
             game_situations.video.write(video_frame)
@@ -200,14 +208,14 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
             frame_index += 1
 
     print(f"Real FPS: {frame_id / (time.time() - start_time):.2f}")
-    end_visualizations(game_situations, writer_det, writer_orig)
+    end_visualizations(game_situations, writer_det, writer_orig, save_video)
     # Show at the end running statistics
     # keyboard_handler.forward_analytics_calls([analytics_display.show_match_acc_summary, analytics_display.show_match_total_run, analytics_display.show_match_sprint_summary], pitch, match, fps_rate, 7)
     return resolving_positions_cache
 
 
 def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str,
-                  cache_homography: bool, cache_initial_positions: bool, cache_resolving: bool):
+                  cache_homography: bool, cache_initial_positions: bool, cache_resolving: bool, save_video: bool):
     """ Two videos are being shown. One real which shows football match and the other one on which detections are being shown.
         Detections are drawn on a pitch image. Detections are mapped by a frame id. This is the current setup in which we first collect whole video and all detections by a tracker and then use this program
         to analyze data. In the future this can maybe be optimized so everything is being run online.
@@ -221,11 +229,14 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     width_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_WIDTH))
     height_orig = int(detections_vid_capture.get(cv.CAP_PROP_FRAME_HEIGHT))
     game_situations = GameSituations(width_orig, height_orig, fps_rate)
-    write_orig = cv.VideoWriter('bboxes.mp4', cv.VideoWriter_fourcc(
-        *'mp4v'), 30, (width_orig, height_orig))
-    height_det, width_det, _ = pitch_img.shape
-    write_det = cv.VideoWriter('detections.mp4', cv.VideoWriter_fourcc(
-        *'mp4v'), 30, (width_det, height_det))
+    if save_video:
+        write_orig = cv.VideoWriter('bboxes.mp4', cv.VideoWriter_fourcc(
+            *'mp4v'), 30, (width_orig, height_orig))
+        height_det, width_det, _ = pitch_img.shape
+        write_det = cv.VideoWriter('detections.mp4', cv.VideoWriter_fourcc(
+            *'mp4v'), 30, (width_det, height_det))
+    else:
+        write_orig, write_det = None, None
 
     # Prepare cache files
     extracted_file_name = utils.get_file_name(path_to_video)
@@ -294,7 +305,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
                   y_coord_det)  # where to put the window
     view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
     resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture,
-                                                    fps_rate, write_orig, write_det, game_situations, resolving_positions_cache)
+                                                    fps_rate, write_orig, write_det, game_situations, save_video, resolving_positions_cache)
     if not cache_resolving and len(resolving_positions_cache) != 0:
         with open(resolving_positions_cache_file, "w") as resolving_positions_file:
             json.dump(resolving_positions_cache,
@@ -330,6 +341,8 @@ if __name__ == "__main__":
                         so that if there are players around the center, the user doesn't need to input to which team does the player belong")
     parser.add_argument("--cache-resolving", required=False, default=False,
                         action="store_true", help="Whether to cache user resolving ids throughout the match")
+    parser.add_argument("--save-video", required=False, default=False, action="store_true",
+                        help="Whether to save detections video and original video with detections")
     args = parser.parse_args()
 
     pitch = Pitch.load_pitch(
@@ -343,7 +356,7 @@ if __name__ == "__main__":
         args.cache_resolving = False
 
     play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path,
-                  args.cache_homography, args.cache_initial_positions, args.cache_resolving)
+                  args.cache_homography, args.cache_initial_positions, args.cache_resolving, args.save_video)
     # Stop the prompting thread
     prompter.running = False
     prompter.join()
