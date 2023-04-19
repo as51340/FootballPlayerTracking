@@ -12,8 +12,6 @@ import seaborn as sns
 import mplsoccer
 import numpy as np
 import pandas as pd
-from time import time
-import sys
 
 import match
 import person

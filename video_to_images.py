@@ -27,8 +27,6 @@ while vid_capture.isOpened():
             f"data/t7/roboflow_football_import/images/frame{str(i).zfill(4)}.jpg", frame
         )
 
-        
-        
         # 20 is in milliseconds, try to increase the value, say 50 and observe
         key = cv2.waitKey(20)
 
