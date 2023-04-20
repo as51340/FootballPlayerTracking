@@ -10,6 +10,7 @@ from collections import defaultdict, OrderedDict
 import numpy as np
 import cv2 as cv
 import pandas as pd
+import constants
 
 import globals
 
@@ -127,7 +128,7 @@ def convert_frame_to_minutes(frame, fps_rate):
     return frame / (fps_rate * 60.0)
 
 
-def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], new_objects_id: List[int]):
+def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], object_ids_in_pitch: List[int], classes_in_pitch: List[int], new_objects_id: List[int]):
     """This method returns information about all objects that don't need to be resolved and about which we already have some information.
 
     Args:
@@ -141,7 +142,7 @@ def get_existing_objects(detections_in_pitch: List[Tuple[int, int]], bb_info_in_
     """
     existing_objects_detections, existing_objects_bb_info, existing_objects_ids = [], [], []
     for i in range(len(object_ids_in_pitch)):
-        if object_ids_in_pitch[i] not in new_objects_id:
+        if object_ids_in_pitch[i] not in new_objects_id and classes_in_pitch[i] == constants.PERSON_CLASS:
             existing_objects_detections.append(detections_in_pitch[i])
             existing_objects_bb_info.append(bb_info_in_pitch[i])
             existing_objects_ids.append(object_ids_in_pitch[i])

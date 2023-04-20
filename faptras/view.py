@@ -55,10 +55,10 @@ class View:
             cv.circle(img_copy, (x, y), constants.RADIUS, constants.RED, -1)
             points.append([x, y])
 
-    def draw_person(self, frame_img: np.ndarray, text: str, center: Tuple[int, int], color: Tuple[int, int, int]):
+    def draw_2d_obj(self, frame_img: np.ndarray, text: str, center: Tuple[int, int], color: Tuple[int, int, int], ball: bool):
         """Draws person as a circle and a text inside.
         """
-        if self.draw_mode == DrawMode.CIRCLE:
+        if self.draw_mode == DrawMode.CIRCLE or ball:
             cv.circle(frame_img, center, 5, color, -1)
         else:
             text_size, _ = cv.getTextSize(

@@ -16,13 +16,14 @@ class SanityChecker:
                 print(
                     f"Multiple instance of object with id: {id_} {objects_ids_to_draw}")
 
-    def clear_already_resolved(self, detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], objects_id_in_pitch: List[int], resolving_positions_cache: Dict[int, int]):
+    def clear_already_resolved(self, detections_in_pitch: List[Tuple[int, int]], bb_info_in_pitch: List[Tuple[int, int, int, int]], objects_id_in_pitch: List[int], classes_in_pitch: List[int], resolving_positions_cache: Dict[int, int]):
         """Removes information about objects that were already resolved based on the resolving positions cache.
 
         Args:
             detections_in_pitch (List[Tuple[int, int]]): Detections inside the pitch.
             bb_info_in_pitch (List[Tuple[int, int, int, int]]): Bounding box for objects inside the pitch.
             objects_id_in_pitch (List[int]): Ids of the objects inside the pitch.
+            classes_in_pitch (List[int]): Classes of all objects
             resolving_positions_cache (Dict[int, int]): Cache: old id to new id
 
         Returns:
@@ -38,4 +39,6 @@ class SanityChecker:
             bb_info_in_pitch) if i not in to_delete]
         objects_id_in_pitch = [id_ for i, id_ in enumerate(
             objects_id_in_pitch) if i not in to_delete]
-        return detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch
+        classes_in_pitch = [cls for i, cls in enumerate(
+            classes_in_pitch) if i not in to_delete]
+        return detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, classes_in_pitch

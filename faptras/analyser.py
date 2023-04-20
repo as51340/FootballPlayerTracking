@@ -87,16 +87,21 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
         frame_img_det = pitch_img.copy()
 
         # This should probably be somehow optimized
-        detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch = sanitizer.clear_already_resolved(
+        detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, classes_in_pitch = sanitizer.clear_already_resolved(
             *pitch.get_objects_within(detections_per_frame, bb_info, object_ids, classes), resolving_positions_cache)
         # Check whether we will have to deal with new object in this frame
-        new_objects_detection, new_objects_bb, new_objects_id = match.get_new_objects(
-            bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch)
+        # New objects can be only persons, not the ball
+        new_objects_detection, new_objects_bb, new_objects_id, ball_id = match.get_new_objects(
+            bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch, classes_in_pitch)
         # All objects that can be resolved from before
         existing_objects_detection, existing_objects_bb, existing_objects_id = utils.get_existing_objects(
-            detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, new_objects_id)
-        assert set(existing_objects_id).union(
-            set(new_objects_id)) == set(objects_id_in_pitch)
+            detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, classes_in_pitch, new_objects_id)
+        if ball_id is None:
+            assert set(existing_objects_id).union(
+                set(new_objects_id)) == set(objects_id_in_pitch)
+        else:
+            assert set(existing_objects_id).union(
+                set(new_objects_id), set([ball_id])) == set(objects_id_in_pitch)
 
         # But if it is caching just try to get all ids from the cache
         if cache_resolving:
@@ -106,7 +111,6 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                                           resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)
         else:
             # Ask resolver for the help
-            print(f"New objects: {new_objects_id}")
             if len(new_objects_id):
                 resolving_info: ai_resolver.ResolvingInfo = resolver.resolve(
                     pitch, match, new_objects_detection, new_objects_bb, new_objects_id, existing_objects_detection, existing_objects_bb, existing_objects_id, frame_id)
@@ -127,16 +131,16 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 for j in range(len(existing_objects_id)):
                     _, existing_person_color, existing_id_to_show = match.get_info_for_drawing(
                         existing_objects_id[j])
-                    view_.draw_person(new_frame_det, str(
-                        existing_id_to_show), existing_objects_detection[j], existing_person_color)
+                    view_.draw_2d_obj(new_frame_det, str(
+                        existing_id_to_show), existing_objects_detection[j], existing_person_color, False)
                 for i in range(len(resolving_info.unresolved_ids)):
                     unresolved_id_str = str(resolving_info.unresolved_ids[i])
                     print(f"Please resolve manually id {unresolved_id_str}")
                     new_frame_bb = video_frame.copy()
                     manual_frame_det = new_frame_det.copy()
                     # Draw unknown object in the 2D space
-                    view_.draw_person(manual_frame_det, unresolved_id_str,
-                                      resolving_info.unresolved_detections[i], constants.BLACK)
+                    view_.draw_2d_obj(manual_frame_det, unresolved_id_str,
+                                      resolving_info.unresolved_detections[i], constants.BLACK, False)
                     if i > 0:
                         resolve_helper.storage.pop()
                     resolve_helper.storage.append(manual_frame_det)
@@ -161,24 +165,31 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
 
         # Process per detection
         showing_ids = set()
+         # TODO: Refactor this code
         for i, frame_detection in enumerate(detections_in_pitch):
             if objects_id_in_pitch[i] in match.ignore_ids:
                 continue
-            person, person_color, id_to_show = match.get_info_for_drawing(
-                objects_id_in_pitch[i])
-            person.last_seen_frame_id = frame_id
-
-            # Validation step
-            assert id_to_show not in showing_ids
-            showing_ids.add(id_to_show)
-
-            if objects_id_in_pitch[i] not in match.ignore_ids:
-                view_.draw_person(frame_img_det, id_to_show, utils.to_tuple_int(
-                    frame_detection), person_color)
+            if classes_in_pitch[i] == constants.BALL_CLASS:
+                id_to_show = "Ball"
+                view_.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), match.ball.color, True)
                 view.View.box_label(
-                    video_frame, bb_info_in_pitch[i], person_color, id_to_show)
-                person.update_person_position(
-                    frame_detection, pitch.pixel_to_meters_positions(frame_detection), frame_id)
+                    video_frame, bb_info_in_pitch[i], match.ball.color, "")
+            else:
+                person, person_color, id_to_show = match.get_info_for_drawing(
+                    objects_id_in_pitch[i])
+                person.last_seen_frame_id = frame_id
+
+                # Validation step
+                assert id_to_show not in showing_ids
+                showing_ids.add(id_to_show)
+
+                if objects_id_in_pitch[i] not in match.ignore_ids:
+                    view_.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(
+                        frame_detection), person_color, False)
+                    view.View.box_label(
+                        video_frame, bb_info_in_pitch[i], person_color, id_to_show)
+                    person.update_person_position(
+                        frame_detection, pitch.pixel_to_meters_positions(frame_detection), frame_id)
 
         # This action needs to be done no matter the visualization mode
         if visualization_mode == VisualizationMode.PLAY:
@@ -282,7 +293,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
         path_to_detections, H)  # ordered by the frame id
     _, (frame_detections1, bb_info1, object_ids1, classes) = detections_storage.popitem(
         last=False)  # detections and object_ids in the 1st frame
-    frame_detections1, bb_info1, object_ids1 = pitch.get_objects_within(
+    frame_detections1, bb_info1, object_ids1, classes1 = pitch.get_objects_within(
         frame_detections1, bb_info1, object_ids1, classes)
     if cache_initial_positions:
         match = Match.cache_team_resolution(pitch, player_cache_file)

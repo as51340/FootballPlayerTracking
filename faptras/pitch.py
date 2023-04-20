@@ -115,17 +115,14 @@ class Pitch:
         Returns:
             2d detections, bounding boxes and ids of the objects inside the pitch.
         """
-        detections_in_pitch, bb_info_ids, object_ids_in_pitch = [], [], []
-        print(f"Classes: {classes}")
-        print(f"Objects: {objects_id}")
-        print(f"BB info: {bb_info}")
+        detections_in_pitch, bb_info_ids, object_ids_in_pitch, classes_in_pitch = [], [], [], []
         for i in range(len(detections)):
-            if not self.is_detection_outside(detections[i][0], detections[i][1]) and classes[i] != constants.BALL_CLASS:
+            if not self.is_detection_outside(detections[i][0], detections[i][1]):
                 detections_in_pitch.append(detections[i])
                 bb_info_ids.append(bb_info[i])
                 object_ids_in_pitch.append(objects_id[i])
-        print(f"Objects within pitch: {object_ids_in_pitch}")
-        return detections_in_pitch, bb_info_ids, object_ids_in_pitch
+                classes_in_pitch.append(classes[i])
+        return detections_in_pitch, bb_info_ids, object_ids_in_pitch, classes_in_pitch
 
 
 if __name__ == "__main__":

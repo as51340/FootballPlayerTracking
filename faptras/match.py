@@ -5,6 +5,7 @@ import numpy as np
 from team import Team
 from pitch import Pitch
 from person import Player, Referee, Person
+from ball import Ball
 import constants
 import view
 import resolve_helpers
@@ -29,6 +30,7 @@ class Match:
         self.ignore_ids = []
         # initial ids in the match. Needed for automatic AI resolver.
         self.initial_ids = set()
+        self.ball = Ball()
 
     def find_person_with_id(self, id: int) -> Person:
         """Checks whether the person with id exists in the Match structure.
@@ -74,8 +76,6 @@ class Match:
             return team1_player, self.team1.color, str(team1_player.label)
         elif team2_player is not None:
             return team2_player, self.team2.color, str(team2_player.label)
-        else:
-            print(f"Id: {input_id}")
 
     def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], detection_info_meters: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
@@ -104,7 +104,7 @@ class Match:
             return True
         return False
 
-    def get_new_objects(self, bb_infos: Tuple[int, int, int, int], object_ids: List[int], detections_in_pitch: List[Tuple[int, int]]):
+    def get_new_objects(self, bb_infos: Tuple[int, int, int, int], object_ids: List[int], detections_in_pitch: List[Tuple[int, int]], classes: List[int]):
         """Returns new objects for the current frame based on the information on ignoring ids and teams.
 
         Args:
@@ -116,12 +116,15 @@ class Match:
         new_object_detections: List[Tuple[int, int]] = []
         new_object_bb: List[Tuple[int, int, int, int]] = []
         new_object_ids: List[int] = []
+        ball_id = None
         for i, obj_id in enumerate(object_ids):
-            if obj_id not in self.ignore_ids and self.find_person_with_id(obj_id) is None:
+            if classes[i] == constants.BALL_CLASS:
+                ball_id = obj_id
+            elif obj_id not in self.ignore_ids and self.find_person_with_id(obj_id) is None:
                 new_object_detections.append(detections_in_pitch[i])
                 new_object_bb.append(bb_infos[i])
                 new_object_ids.append(obj_id)
-        return new_object_detections, new_object_bb, new_object_ids
+        return new_object_detections, new_object_bb, new_object_ids, ball_id
 
     def resolve_user_action_helper(self, prompt: str, obj_id: int, det: Tuple[int, int], resolving_positions_cache: Dict[int, int], new_obj_ids: List[int], existing_obj_ids: List[int], resolve_helper: resolve_helpers.LastNFramesHelper, prompter):
         """Helper action used when needed recursion to resolve user action.
