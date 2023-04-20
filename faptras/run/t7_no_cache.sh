@@ -1,1 +1,1 @@
-python ../analyser.py --workdir ../workdir --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp13/tracks/t7.txt --pitch-path ../pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg
+python ../analyser.py --workdir ../workdir --match-name t7 --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp13/tracks/t7.txt --pitch-path ../pitches_data/mplsoccer_pitch.png

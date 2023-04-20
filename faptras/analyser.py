@@ -9,7 +9,8 @@ import numpy as np
 import cv2 as cv
 
 from monitor_utils import get_offset_to_second_monitor
-import view
+import view as view_lib
+from view import View
 import analytics_viewer
 from pitch import Pitch
 from match import Match
@@ -38,12 +39,12 @@ def end_visualizations(game_situations: GameSituations, writer_det, writer_orig,
     pass
 
 
-def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture,
+def play_visualizations(view: View, pitch: Pitch, match: Match, detections_storage, pitch_img, detections_vid_capture,
                         fps_rate: int, writer_orig, writer_det, game_situations: GameSituations, save_video: bool, resolving_positions_cache: dict = None):
     """Plays visualization of both, real video and video created with the usage of homography.
 
     Args:
-        view_ (view.View): A reference to the view object.
+        view (view.View): A reference to the view object.
         pitch (Pitch): A reference to the pitch.
         detections_storage (_type_): Information needed to run visualization obtained by squash_detections function.
         pitch_img (_type_): A reference to the 2D pitch image.
@@ -70,7 +71,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     analytics_display = analytics_viewer.AnalyticsViewer()
     resolver = ai_resolver.Resolver(fps_rate)
     sanitizer = sanity_checker.SanityChecker()
-    resolve_helper = resolve_helpers.LastNFramesHelper(250, view_)
+    resolve_helper = resolve_helpers.LastNFramesHelper(250, view)
     visualization_mode = VisualizationMode.PLAY
 
     # Run visualizations
@@ -131,24 +132,24 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 for j in range(len(existing_objects_id)):
                     _, existing_person_color, existing_id_to_show = match.get_info_for_drawing(
                         existing_objects_id[j])
-                    view_.draw_2d_obj(new_frame_det, str(
-                        existing_id_to_show), existing_objects_detection[j], existing_person_color, False)
+                    view.draw_2d_obj(new_frame_det, str(
+                        existing_id_to_show), existing_objects_detection[j], existing_person_color, False, view_lib.DrawMode.ID)
                 for i in range(len(resolving_info.unresolved_ids)):
-                    unresolved_id_str = str(resolving_info.unresolved_ids[i])
+                    unresolved_id_str  = str(resolving_info.unresolved_ids[i])
                     print(f"Please resolve manually id {unresolved_id_str}")
                     new_frame_bb = video_frame.copy()
                     manual_frame_det = new_frame_det.copy()
                     # Draw unknown object in the 2D space
-                    view_.draw_2d_obj(manual_frame_det, unresolved_id_str,
-                                      resolving_info.unresolved_detections[i], constants.BLACK, False)
+                    view.draw_2d_obj(manual_frame_det, unresolved_id_str,
+                                     resolving_info.unresolved_detections[i], constants.BLACK, False, view_lib.DrawMode.ID)
                     if i > 0:
                         resolve_helper.storage.pop()
                     resolve_helper.storage.append(manual_frame_det)
                     # Draw unknown object in the real video
-                    view.View.box_label(
+                    View.box_label(
                         new_frame_bb, resolving_info.unresolved_bbs[i], constants.BLACK, unresolved_id_str)
                     prompter.set_execution_config(constants.prompt_input)
-                    view.View.show_img_while_not_killed(
+                    View.show_img_while_not_killed(
                         [constants.VIDEO_WINDOW, constants.DETECTIONS_WINDOW], [new_frame_bb, manual_frame_det])
                     action = int(prompter.value)
                     match.resolve_user_action(action, resolving_info.unresolved_ids[i], resolving_info.unresolved_detections[
@@ -159,20 +160,20 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
 
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
-
+ 
         # Before visualizing, run sanity check
         sanitizer.check(objects_id_in_pitch)
 
         # Process per detection
         showing_ids = set()
-         # TODO: Refactor this code
+        # TODO: Refactor this code
         for i, frame_detection in enumerate(detections_in_pitch):
             if objects_id_in_pitch[i] in match.ignore_ids:
                 continue
             if classes_in_pitch[i] == constants.BALL_CLASS:
                 id_to_show = "Ball"
-                view_.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), match.ball.color, True)
-                view.View.box_label(
+                view.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), constants.BLACK, True, view_lib.DrawMode.ID)
+                View.box_label(
                     video_frame, bb_info_in_pitch[i], match.ball.color, "")
             else:
                 person, person_color, id_to_show = match.get_info_for_drawing(
@@ -184,9 +185,9 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                 showing_ids.add(id_to_show)
 
                 if objects_id_in_pitch[i] not in match.ignore_ids:
-                    view_.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(
+                    view.draw_2d_obj(frame_img_det, person, utils.to_tuple_int(
                         frame_detection), person_color, False)
-                    view.View.box_label(
+                    View.box_label(
                         video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                     person.update_person_position(
                         frame_detection, pitch.pixel_to_meters_positions(frame_detection), frame_id)
@@ -207,7 +208,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
 
         # Handle key-press
         stop, seek_frame = keyboard_handler.handle_key_press(
-            k, view_, analytics_display, pitch, match, fps_rate, frame_id, game_situations)
+            k, view, analytics_display, pitch, match, fps_rate, frame_id, game_situations)
         if stop:
             break
         if seek_frame != 0:
@@ -226,8 +227,8 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     return resolving_positions_cache
 
 
-def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str,
-                  cache_homography: bool, cache_initial_positions: bool, cache_resolving: bool, save_video: bool):
+def play_analysis(view: View, pitch: Pitch, path_to_pitch: str, path_to_video: str, path_to_ref_img: str, path_to_detections: str,
+                  cache_homography: bool, cache_initial_positions: bool, cache_resolving: bool, save_video: bool, match_name: str):
     """ Two videos are being shown. One real which shows football match and the other one on which detections are being shown.
         Detections are drawn on a pitch image. Detections are mapped by a frame id. This is the current setup in which we first collect whole video and all detections by a tracker and then use this program
         to analyze data. In the future this can maybe be optimized so everything is being run online.
@@ -252,11 +253,12 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
 
     # Prepare cache files
     extracted_file_name = utils.get_file_name(path_to_video)
-    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + ".npy"
+    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + "_" + utils.get_file_name(path_to_pitch) +  ".npy"
     player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + \
         extracted_file_name + ".txt"
     resolving_positions_cache_file = config.PATH_TO_RESOLVING_POSITIONS + \
         extracted_file_name + ".json"
+    print(f"Initial positions cache file: {player_cache_file}")
 
     # Prepare homography
     if cache_homography:
@@ -267,10 +269,10 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
         except AttributeError | FileNotFoundError:
             print(f"Loading homography matrix failed, you will have to id manually...")
             reference_frame, H = homography.do_homography(
-                view_, detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
+                view, detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
     else:
         reference_frame, H = homography.do_homography(
-            view_, detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
+            view, detections_vid_capture, path_to_ref_img, path_to_pitch, homo_file)
     print(f"H: {H:}")
 
     # Prepare resolving cache
@@ -293,12 +295,12 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
         path_to_detections, H)  # ordered by the frame id
     _, (frame_detections1, bb_info1, object_ids1, classes) = detections_storage.popitem(
         last=False)  # detections and object_ids in the 1st frame
-    frame_detections1, bb_info1, object_ids1, classes1 = pitch.get_objects_within(
+    frame_detections1, bb_info1, object_ids1, _ = pitch.get_objects_within(
         frame_detections1, bb_info1, object_ids1, classes)
     if cache_initial_positions:
         match = Match.cache_team_resolution(pitch, player_cache_file)
         if not match:
-            print("User needs to resolve initial settings.")
+            print("Fallback, user needs to resolve initial settings.")
             match = Match.user_team_resolution(
                 pitch, object_ids1, frame_detections1, bb_info1, reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
         else:
@@ -310,13 +312,14 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
 
     # Prepare visualizations
     cv.namedWindow(constants.DETECTIONS_WINDOW)
+    cv.setWindowTitle(constants.DETECTIONS_WINDOW, match_name if match_name is not None else "Match")
     monitor_info = get_offset_to_second_monitor()
     x_coord_det, y_coord_det = int(
         monitor_info[0] + 0.5 * monitor_info[2]), int(monitor_info[1] + 0.75 * monitor_info[3])
     cv.moveWindow(constants.DETECTIONS_WINDOW, x_coord_det,
                   y_coord_det)  # where to put the window
-    view.View.full_screen_on_monitor(constants.VIDEO_WINDOW)
-    resolving_positions_cache = play_visualizations(view_, pitch, match, detections_storage, pitch_img, detections_vid_capture,
+    View.full_screen_on_monitor(constants.VIDEO_WINDOW)
+    resolving_positions_cache = play_visualizations(view, pitch, match, detections_storage, pitch_img, detections_vid_capture,
                                                     fps_rate, write_orig, write_det, game_situations, save_video, resolving_positions_cache)
     if not cache_resolving and len(resolving_positions_cache) != 0:
         with open(resolving_positions_cache_file, "w") as resolving_positions_file:
@@ -355,20 +358,23 @@ if __name__ == "__main__":
                         action="store_true", help="Whether to cache user resolving ids throughout the match")
     parser.add_argument("--save-video", required=False, default=False, action="store_true",
                         help="Whether to save detections video and original video with detections")
+    parser.add_argument("--match-name", type=str, required=False, help="Match name")
     args = parser.parse_args()
 
     pitch = Pitch.load_pitch(
         args.pitch_path, args.pitch_length, args.pitch_width)
+    print(f"Pitch path: {args.pitch_path}")
+    print(f"Pitch: {pitch.img_path}")
     # Setup view
-    view_ = view.View(view.ViewMode.NORMAL)
-    # view_.full_screen_on_monitor(constants.VIDEO_WINDOW)
+    view = View(view_lib.ViewMode.NORMAL)
+    # view.full_screen_on_monitor(constants.VIDEO_WINDOW)
     ref_img = args.workdir + "/ref_img.jpg"
     if not args.cache_homography:
         args.cache_initial_positions = False
         args.cache_resolving = False
 
-    play_analysis(view_, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path,
-                  args.cache_homography, args.cache_initial_positions, args.cache_resolving, args.save_video)
+    play_analysis(view, pitch, args.pitch_path, args.video_path, ref_img, args.detections_path,
+                  args.cache_homography, args.cache_initial_positions, args.cache_resolving, args.save_video, args.match_name)
     # Stop the prompting thread
     prompter.running = False
     prompter.join()

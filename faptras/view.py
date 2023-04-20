@@ -9,15 +9,16 @@ import constants
 import globals
 from monitor_utils import get_offset_to_second_monitor
 import utils
+from person import Person
 # Must not import match due to the circular import
 
 ViewMode = Enum('ViewMode', ['FULL', 'NORMAL'])  # full screen vs normal mode
-DrawMode = Enum('DrawMode', ['CIRCLE', 'TEXT'])
+DrawMode = Enum('DrawMode', ['ID', 'TEXT'])
 
 
 TEXT_FACE = cv.FONT_HERSHEY_DUPLEX
-TEXT_SCALE = 0.5
-TEXT_THICKNESS = 1
+TEXT_SCALE = 0.6
+TEXT_THICKNESS = 2
 
 
 class View:
@@ -39,10 +40,10 @@ class View:
             self.view_mode = ViewMode.FULL
 
     def switch_draw_mode(self):
-        if self.draw_mode == DrawMode.CIRCLE:
+        if self.draw_mode == DrawMode.ID:
             self.draw_mode = DrawMode.TEXT
         else:
-            self.draw_mode = DrawMode.CIRCLE
+            self.draw_mode = DrawMode.ID
 
     # mouse callback function
     def _select_points_wrapper(self, event, x, y, _, params):
@@ -55,12 +56,18 @@ class View:
             cv.circle(img_copy, (x, y), constants.RADIUS, constants.RED, -1)
             points.append([x, y])
 
-    def draw_2d_obj(self, frame_img: np.ndarray, text: str, center: Tuple[int, int], color: Tuple[int, int, int], ball: bool):
+    def draw_2d_obj(self, frame_img: np.ndarray, person: Person, center: Tuple[int, int], color: Tuple[int, int, int], ball: bool, draw_mode: DrawMode = None):
         """Draws person as a circle and a text inside.
         """
-        if self.draw_mode == DrawMode.CIRCLE or ball:
-            cv.circle(frame_img, center, 5, color, -1)
+        if ball:
+            cv.circle(frame_img, center, 7, color, -1)
         else:
+            if draw_mode == DrawMode.ID:
+                text = person
+            elif self.draw_mode == DrawMode.ID:
+                text = str(person.ids[0])
+            else:
+                text = person.name
             text_size, _ = cv.getTextSize(
                 text, TEXT_FACE, TEXT_SCALE, TEXT_THICKNESS)
             text_origin = (int(center[0] - text_size[0] / 2),

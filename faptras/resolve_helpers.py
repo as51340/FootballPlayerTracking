@@ -6,13 +6,13 @@ import cv2 as cv
 
 import globals
 import utils
-import view
+import view as view_lib
 import constants
 
 
 class LastNFramesHelper:
 
-    def __init__(self, n: int, view_: view.View) -> None:
+    def __init__(self, n: int, view_: view_lib.View) -> None:
         self.n = n
         self.storage: Deque = deque(maxlen=n)
         self.view_ = view_
@@ -23,8 +23,8 @@ class LastNFramesHelper:
             time.sleep(3)
             for img in self.storage:
                 img_copy = img.copy()  # copy of the image so we don't have multiple black ids
-                self.view_.draw_person(img_copy, str(
-                    new_id), new_det, constants.BLACK)
+                self.view_.draw_2d_obj(img_copy, str(
+                    new_id), new_det, constants.BLACK, False, view_lib.DrawMode.ID)
                 if globals.stop_thread:
                     break
                 cv.imshow(window, img_copy)
