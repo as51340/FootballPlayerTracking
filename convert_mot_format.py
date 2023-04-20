@@ -6,8 +6,9 @@ def convert_file(path_to_file: str, path_to_save: str):
             while (line := orig_file.readline()):
                 elements = line.strip().split(" ")
                 # new_line = " ".join(elements[0:len(elements)-1])
-                new_line = " ".join(elements[0:2]) + " "
-                new_line += " ".join(elements[3:])
+                # new_line = " ".join(elements[0:2]) + " "
+                new_line = elements[0] + " "
+                new_line += " ".join(elements[2:])
                 # new_line = " ".join(elements)
                 new_file.write(new_line + "\n")
     

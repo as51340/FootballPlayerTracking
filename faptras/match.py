@@ -74,6 +74,8 @@ class Match:
             return team1_player, self.team1.color, str(team1_player.label)
         elif team2_player is not None:
             return team2_player, self.team2.color, str(team2_player.label)
+        else:
+            print(f"Id: {input_id}")
 
     def resolve_team_helper(self, id: int, detection_info: Tuple[float, float], detection_info_meters: Tuple[float, float], team: int, jersey_number: int, name: str):
         """Adds player to the team based on the team name and returns True. If no such team exists in the match, the method returns false.
@@ -208,11 +210,12 @@ class Match:
         return match
 
     @classmethod
-    def user_team_resolution(cls, pitch: Pitch, obj_ids: List[int], detections_info: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], img: np.ndarray, window: str, cache_file: str, prompter) -> None:
+    def user_team_resolution(cls, pitch: Pitch, classes: List[int], obj_ids: List[int], detections_info: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], img: np.ndarray, window: str, cache_file: str, prompter) -> None:
         """User manually decides about the team of the player shown on the image. If user inputs the team that is not part of the current match, the procedure is repeated for the same player.
 
         Args:
             pitch (Pitch): _description_
+            classes (List[int]): Objects' classes
             obj_ids (List[int]): _description_
             detections_info (List[Tuple[int, int]]): _description_
             bb_info (List[Tuple[int, int, int, int]]): _description_
@@ -231,6 +234,8 @@ class Match:
         match = Match(team_name1, team_name2)
         player_cache: Tuple[int, Tuple[str, Tuple[int, int]]] = dict()
         for i, bb_obj_info in enumerate(bb_info):
+            if classes[i] == constants.BALL_CLASS:
+                continue
             show_frame = img.copy()
             view.View.box_label(show_frame, bb_obj_info,
                                 constants.BLACK, obj_ids[i])

@@ -49,7 +49,7 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
     start_time = time.time()
     storage = OrderedDict()
     last_frame_id = sys.maxsize
-    detections, objects, bb_info = [], [], []
+    detections, objects, bb_info, classes = [], [], [], []
     def scaler_homo_func(row): return [int(
         row[0] / row[2]), int(row[1] / row[2])]
     start = False
@@ -62,23 +62,25 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
                 start = True
                 start_frame_id = int(line[0])
             frame_id = int(line[0]) - start_frame_id + 1
-            object_id = int(line[1])
-            bb_left = float(line[2])
-            bb_top = float(line[3])
-            bb_width = float(line[4])
-            bb_height = float(line[5])
+            class_id = int(line[1])
+            object_id = int(line[2])
+            bb_left = float(line[3])
+            bb_top = float(line[4])
+            bb_width = float(line[5])
+            bb_height = float(line[6])
             # Calculate lower center
             if frame_id > last_frame_id:
                 detections = np.array(detections)@H.T
                 detections = np.apply_along_axis(
                     scaler_homo_func, 1, detections)
                 assert detections.shape[0] == len(objects) == len(bb_info)
-                storage[last_frame_id] = (detections, bb_info, objects)
-                detections, objects, bb_info = [], [], []
+                storage[last_frame_id] = (detections, bb_info, objects, classes)
+                detections, objects, bb_info, classes = [], [], [], []
             # For every frame do
             detections.append(
                 [bb_left + 0.5 * bb_width, bb_top + bb_height, 1])
             objects.append(object_id)
+            classes.append(class_id)
             bb_info.append([int(bb_left), int(bb_top),
                            int(bb_width), int(bb_height)])
             last_frame_id = frame_id

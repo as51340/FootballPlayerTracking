@@ -79,7 +79,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
     frame_index = 0
     while frame_index < len(detections_storage):
         frame_id, (detections_per_frame, bb_info,
-                   object_ids) = detections_storage[frame_index]
+                   object_ids, classes) = detections_storage[frame_index]
         # Real video
         _, video_frame = detections_vid_capture.read()
 
@@ -88,7 +88,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
 
         # This should probably be somehow optimized
         detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch = sanitizer.clear_already_resolved(
-            *pitch.get_objects_within(detections_per_frame, bb_info, object_ids), resolving_positions_cache)
+            *pitch.get_objects_within(detections_per_frame, bb_info, object_ids, classes), resolving_positions_cache)
         # Check whether we will have to deal with new object in this frame
         new_objects_detection, new_objects_bb, new_objects_id = match.get_new_objects(
             bb_info_in_pitch, objects_id_in_pitch, detections_in_pitch)
@@ -106,6 +106,7 @@ def play_visualizations(view_: view.View, pitch: Pitch, match: Match, detections
                                           resolving_positions_cache, new_objects_id, existing_objects_id, resolve_helper, prompter)
         else:
             # Ask resolver for the help
+            print(f"New objects: {new_objects_id}")
             if len(new_objects_id):
                 resolving_info: ai_resolver.ResolvingInfo = resolver.resolve(
                     pitch, match, new_objects_detection, new_objects_bb, new_objects_id, existing_objects_detection, existing_objects_bb, existing_objects_id, frame_id)
@@ -279,10 +280,10 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
     # Prepare initialization
     detections_storage: OrderedDict = utils.squash_detections(
         path_to_detections, H)  # ordered by the frame id
-    _, (frame_detections1, bb_info1, object_ids1) = detections_storage.popitem(
+    _, (frame_detections1, bb_info1, object_ids1, classes) = detections_storage.popitem(
         last=False)  # detections and object_ids in the 1st frame
     frame_detections1, bb_info1, object_ids1 = pitch.get_objects_within(
-        frame_detections1, bb_info1, object_ids1)
+        frame_detections1, bb_info1, object_ids1, classes)
     if cache_initial_positions:
         match = Match.cache_team_resolution(pitch, player_cache_file)
         if not match:
@@ -293,7 +294,7 @@ def play_analysis(view_: view.View, pitch: Pitch, path_to_pitch: str, path_to_vi
             print("Using cached initial settings.")
     else:
         print("User needs to resolve initial setting.")
-        match = Match.user_team_resolution(pitch, object_ids1, frame_detections1, bb_info1,
+        match = Match.user_team_resolution(pitch, classes, object_ids1, frame_detections1, bb_info1,
                                            reference_frame, constants.VIDEO_WINDOW, player_cache_file, prompter)
 
     # Prepare visualizations

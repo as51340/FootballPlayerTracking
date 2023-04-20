@@ -1,1 +1,1 @@
-python ../analyser.py --workdir ../workdir --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp13/tracks/t7.txt --pitch-path ../pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg --cache-homography --cache-initial-positions --cache-resolving
+python ../analyser.py --workdir ../workdir --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp95/tracks/t7.txt --pitch-path ../pitches_data/green_pitch_rotated_1/green_pitch_rotated_1.jpg --cache-homography --cache-initial-positions --cache-resolving

@@ -5,6 +5,7 @@ from ast import literal_eval
 
 import config
 import utils
+import constants
 
 PitchOrientation = Enum('PitchOrientation', ['LENGTH', 'WIDTH'])
 
@@ -104,23 +105,26 @@ class Pitch:
             return True
         return False
 
-    def get_objects_within(self, detections: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], objects_id: List[int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int, int, int]], List[int]]:
+    def get_objects_within(self, detections: List[Tuple[int, int]], bb_info: List[Tuple[int, int, int, int]], objects_id: List[int], classes: List[int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int, int, int]], List[int]]:
         """Returns detections (2D objects), bounding boxes and object_ids only of objects which are within the pitch boundary based on the 2D image.
 
         Args:
             detections (List[Tuple[int, int]]): 2D detections.
             bb_info (List[Tuple[int, int, int, int]]): Bounding box information.
             object_ids (List[int]): Objects id.
-
         Returns:
             2d detections, bounding boxes and ids of the objects inside the pitch.
         """
         detections_in_pitch, bb_info_ids, object_ids_in_pitch = [], [], []
+        print(f"Classes: {classes}")
+        print(f"Objects: {objects_id}")
+        print(f"BB info: {bb_info}")
         for i in range(len(detections)):
-            if not self.is_detection_outside(detections[i][0], detections[i][1]):
+            if not self.is_detection_outside(detections[i][0], detections[i][1]) and classes[i] != constants.BALL_CLASS:
                 detections_in_pitch.append(detections[i])
                 bb_info_ids.append(bb_info[i])
                 object_ids_in_pitch.append(objects_id[i])
+        print(f"Objects within pitch: {object_ids_in_pitch}")
         return detections_in_pitch, bb_info_ids, object_ids_in_pitch
 
 
