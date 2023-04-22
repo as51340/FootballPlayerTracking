@@ -1,1 +1,1 @@
-python ../analyser.py --match-name t7--workdir ../workdir --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp95/tracks/t7.txt --pitch-path ../pitches_data/mplsoccer_pitch.png --cache-homography
+python ../analyser.py --match-name t7 --workdir ../workdir --video-path ../../data/t7.mp4 --detections-path ../../results/track/exp95/tracks/t7.txt --pitch-path ../pitches_data/mplsoccer_pitch.png --cache-homography

@@ -104,6 +104,12 @@ class Match:
             return True
         return False
 
+    def find_ball_id(self, objects_id: List[int], classes: List[int]) -> int:
+        for i, obj_id in enumerate(objects_id):
+            if classes[i] == constants.BALL_CLASS:
+                return obj_id
+        return None
+
     def get_new_objects(self, bb_infos: Tuple[int, int, int, int], object_ids: List[int], detections_in_pitch: List[Tuple[int, int]], classes: List[int]):
         """Returns new objects for the current frame based on the information on ignoring ids and teams.
 

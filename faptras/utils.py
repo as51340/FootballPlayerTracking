@@ -51,8 +51,8 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
     storage = OrderedDict()
     last_frame_id = sys.maxsize
     detections, objects, bb_info, classes = [], [], [], []
-    def scaler_homo_func(row): return [int(
-        row[0] / row[2]), int(row[1] / row[2])]
+    def scaler_homo_func(row): return [
+        row[0] / row[2], row[1] / row[2]]
     start = False
     with open(path_to_detections, "r") as d_file:
         lines = d_file.readlines()
@@ -75,7 +75,8 @@ def squash_detections(path_to_detections: str, H: np.ndarray):
                 detections = np.apply_along_axis(
                     scaler_homo_func, 1, detections)
                 assert detections.shape[0] == len(objects) == len(bb_info)
-                storage[last_frame_id] = (detections, bb_info, objects, classes)
+                storage[last_frame_id] = (
+                    detections, bb_info, objects, classes)
                 detections, objects, bb_info, classes = [], [], [], []
             # For every frame do
             detections.append(

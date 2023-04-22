@@ -1,7 +1,13 @@
 from typing import List, Tuple, Dict
 
 
-class Person:
+from collections import deque
+import numpy as np
+
+import constants
+from smoother import SmootherPosition
+
+class Person(SmootherPosition):
 
     def __init__(self, name: str, initial_id: int, initial_position: Tuple[float, float], initial_position_meters: Tuple[float, float]) -> None:
         """Referees and players will have initial_id. This is different from player's jersey number. All persons can have multiple ids -> those are ids given by the detection algorithm.
@@ -10,8 +16,9 @@ class Person:
             name (str): Person's name in the real life.
             initial_id (int): Initial id of this detection.
             initial_position (Tuple[float, float]): Player's initial position in 2D space in pixels.
-            initial_position_meters (Tuple[float, float]): Player's initial position in meters. 
+            initial_position_meters (Tuple[float, float]): Player's initial position in meters.
         """
+        super().__init__()
         self.name = name
         self.ids: List[int] = [initial_id]
         # in 2D space in pixels
@@ -22,6 +29,8 @@ class Person:
         self.last_seen_frame_id = 2
         self.all_positions: Dict[int, Tuple[float, float]] = {
             2: initial_position}  # in 2D space in pixels
+        self.x_window.append(initial_position[0]) # in 2D space in pixels
+        self.y_window.append(initial_position[1]) # in 2D space in pixels
 
     def update_person_position(self, new_position: Tuple[float, float], new_position_meters: Tuple[float, float], current_frame_id: int) -> None:
         """Updates person position.

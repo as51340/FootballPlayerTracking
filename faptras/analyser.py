@@ -78,6 +78,24 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
     # it is ordered dict so order is preserved
     detections_storage = list(detections_storage.items())
     frame_index = 0
+
+    # Smooth player positions and assume that all players are visible in the first constants.POSITION_SMOOTHING_AVG_WINDOW frames
+    for frame_index in range(constants.POSITION_SMOOTHING_AVG_WINDOW-1):
+        # Unused but necessary to discard
+        _, _ = detections_vid_capture.read()
+        # Obtain information about the frame
+        frame_id, (detections_per_frame, bb_info,
+                   object_ids, classes) = detections_storage[frame_index]
+        # Get only info about objects inside the pitch
+        detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, classes_in_pitch = sanitizer.clear_already_resolved(
+            *pitch.get_objects_within(detections_per_frame, bb_info, object_ids, classes), resolving_positions_cache)
+        
+        # Iterate over
+        for i, frame_detection in enumerate(detections_in_pitch):
+            person = match.find_person_with_id(objects_id_in_pitch[i])
+            person.update_drawing_position(frame_detection)
+            
+    # TODO: incorporate correct position of resolver to draw smoothed position
     while frame_index < len(detections_storage):
         frame_id, (detections_per_frame, bb_info,
                    object_ids, classes) = detections_storage[frame_index]
@@ -135,7 +153,7 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
                     view.draw_2d_obj(new_frame_det, str(
                         existing_id_to_show), existing_objects_detection[j], existing_person_color, False, view_lib.DrawMode.ID)
                 for i in range(len(resolving_info.unresolved_ids)):
-                    unresolved_id_str  = str(resolving_info.unresolved_ids[i])
+                    unresolved_id_str = str(resolving_info.unresolved_ids[i])
                     print(f"Please resolve manually id {unresolved_id_str}")
                     new_frame_bb = video_frame.copy()
                     manual_frame_det = new_frame_det.copy()
@@ -160,7 +178,7 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
 
         # Wait for the new key
         k = cv.waitKey(1) & 0xFF
- 
+
         # Before visualizing, run sanity check
         sanitizer.check(objects_id_in_pitch)
 
@@ -172,7 +190,9 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
                 continue
             if classes_in_pitch[i] == constants.BALL_CLASS:
                 id_to_show = "Ball"
-                view.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(frame_detection), constants.BLACK, True, view_lib.DrawMode.ID)
+                ball_position = match.ball.update_drawing_position(frame_detection)
+                view.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(
+                    ball_position), constants.BLACK, True, view_lib.DrawMode.ID)
                 View.box_label(
                     video_frame, bb_info_in_pitch[i], match.ball.color, "")
             else:
@@ -185,8 +205,10 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
                 showing_ids.add(id_to_show)
 
                 if objects_id_in_pitch[i] not in match.ignore_ids:
+                    position_to_draw = person.update_drawing_position(
+                        frame_detection)
                     view.draw_2d_obj(frame_img_det, person, utils.to_tuple_int(
-                        frame_detection), person_color, False)
+                        position_to_draw), person_color, False)
                     View.box_label(
                         video_frame, bb_info_in_pitch[i], person_color, id_to_show)
                     person.update_person_position(
@@ -253,7 +275,8 @@ def play_analysis(view: View, pitch: Pitch, path_to_pitch: str, path_to_video: s
 
     # Prepare cache files
     extracted_file_name = utils.get_file_name(path_to_video)
-    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + "_" + utils.get_file_name(path_to_pitch) +  ".npy"
+    homo_file = config.PATH_TO_HOMOGRAPHY_MATRICES + extracted_file_name + \
+        "_" + utils.get_file_name(path_to_pitch) + ".npy"
     player_cache_file = config.PATH_TO_INITIAL_PLAYER_POSITIONS + \
         extracted_file_name + ".txt"
     resolving_positions_cache_file = config.PATH_TO_RESOLVING_POSITIONS + \
@@ -261,6 +284,7 @@ def play_analysis(view: View, pitch: Pitch, path_to_pitch: str, path_to_video: s
     print(f"Initial positions cache file: {player_cache_file}")
 
     # Prepare homography
+    # In both cases, we take reference frame so persons have starting frame_id from 2
     if cache_homography:
         _, reference_frame = detections_vid_capture.read()
         try:
@@ -312,7 +336,8 @@ def play_analysis(view: View, pitch: Pitch, path_to_pitch: str, path_to_video: s
 
     # Prepare visualizations
     cv.namedWindow(constants.DETECTIONS_WINDOW)
-    cv.setWindowTitle(constants.DETECTIONS_WINDOW, match_name if match_name is not None else "Match")
+    cv.setWindowTitle(constants.DETECTIONS_WINDOW,
+                      match_name if match_name is not None else "Match")
     monitor_info = get_offset_to_second_monitor()
     x_coord_det, y_coord_det = int(
         monitor_info[0] + 0.5 * monitor_info[2]), int(monitor_info[1] + 0.75 * monitor_info[3])
@@ -358,7 +383,8 @@ if __name__ == "__main__":
                         action="store_true", help="Whether to cache user resolving ids throughout the match")
     parser.add_argument("--save-video", required=False, default=False, action="store_true",
                         help="Whether to save detections video and original video with detections")
-    parser.add_argument("--match-name", type=str, required=False, help="Match name")
+    parser.add_argument("--match-name", type=str,
+                        required=False, help="Match name")
     args = parser.parse_args()
 
     pitch = Pitch.load_pitch(
