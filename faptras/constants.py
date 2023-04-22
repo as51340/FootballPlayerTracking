@@ -4,6 +4,7 @@ RED = (0, 0, 255)
 BLUE = (255, 0, 0)
 YELLOW = (0, 255, 255)
 BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
 RADIUS = 5
 # SRC_WINDOW and DST_WINDOW are used for homography calculation
 # DETECTIONS_WINDOW is used for birds-eye view on the pitch

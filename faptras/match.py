@@ -97,7 +97,7 @@ class Match:
                 Player(name, jersey_number, id, detection_info, detection_info_meters))
         elif team == 2:
             self.referee = Referee(
-                name, id, constants.YELLOW, detection_info, detection_info_meters)
+                name, id, constants.GREEN, detection_info, detection_info_meters)
 
         if team < 3:  # team1, team2 or referee
             self.initial_ids.add(id)

@@ -12,10 +12,10 @@ import constants
 
 class LastNFramesHelper:
 
-    def __init__(self, n: int, view_: view_lib.View) -> None:
+    def __init__(self, n: int, view: view_lib.View) -> None:
         self.n = n
         self.storage: Deque = deque(maxlen=n)
-        self.view_ = view_
+        self.view = view
 
     def visualize(self, window: str, new_id: int, new_det: Tuple[int, int]):
         globals.stop_thread = False
@@ -23,7 +23,7 @@ class LastNFramesHelper:
             time.sleep(3)
             for img in self.storage:
                 img_copy = img.copy()  # copy of the image so we don't have multiple black ids
-                self.view_.draw_2d_obj(img_copy, str(
+                self.view.draw_2d_obj(img_copy, str(
                     new_id), new_det, constants.BLACK, False, view_lib.DrawMode.ID)
                 if globals.stop_thread:
                     break

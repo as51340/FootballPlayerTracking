@@ -15,7 +15,6 @@ from person import Person
 ViewMode = Enum('ViewMode', ['FULL', 'NORMAL'])  # full screen vs normal mode
 DrawMode = Enum('DrawMode', ['ID', 'TEXT'])
 
-
 TEXT_FACE = cv.FONT_HERSHEY_DUPLEX
 TEXT_SCALE = 0.6
 TEXT_THICKNESS = 2
