@@ -7,6 +7,7 @@ import numpy as np
 import constants
 
 
+# Behaves as an interface for all objects whose position isn't visualized in real time but is smoothed instead.
 class SmootherPosition(abc.ABC):
 
     def __init__(self) -> None:
@@ -14,7 +15,7 @@ class SmootherPosition(abc.ABC):
         self.y_window = deque()
 
     def update_drawing_position(self, new_position: Tuple[float, float]) -> Tuple[float, float]:
-        """Updates player's window of positions and returns smoothed position if the window is of size constants.POSITION_SMOOTHING_AVG_WINDOW."""
+        """Updates window of positions and returns smoothed position if the window is of size constants.POSITION_SMOOTHING_AVG_WINDOW. Otherwise, returns the latest position."""
         # If we don't have enough data, then just return the latest position
         if len(self.x_window) < constants.POSITION_SMOOTHING_AVG_WINDOW:
             self.x_window.append(new_position[0])

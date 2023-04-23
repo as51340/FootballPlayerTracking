@@ -13,4 +13,10 @@ class Ball(SmootherPosition):
         super().__init__()
         self.current_position = None
         self.color = constants.WHITE
+        self.positions = []  # All positions of the ball
+    
+    def update_position(self, new_position: Tuple[float, float]) -> None:
+        """Updates ball position."""
+        self.current_position = new_position
+        self.positions.append(new_position)
 

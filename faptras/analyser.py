@@ -191,6 +191,7 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
             if classes_in_pitch[i] == constants.BALL_CLASS:
                 id_to_show = "Ball"
                 ball_position = match.ball.update_drawing_position(frame_detection)
+                match.ball.update_position(frame_detection)
                 view.draw_2d_obj(frame_img_det, id_to_show, utils.to_tuple_int(
                     ball_position), constants.BLACK, True, view_lib.DrawMode.ID)
                 View.box_label(
