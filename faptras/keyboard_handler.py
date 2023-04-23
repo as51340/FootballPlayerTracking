@@ -54,14 +54,14 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
             time.sleep(2)
         if team is not None:
             forward_analytics_call(
-                analytics_display.draw_convex_hull_for_players, pitch, team, frame_id, left)
+                analytics_display.draw_convex_hull_for_players, match, pitch, team, frame_id, left)
     elif k == ord('d'):  # delaunay tessellation
         forward_analytics_call(
             analytics_display.draw_delaunay_tessellation, match, pitch, frame_id)
-    elif k == ord('e'):
+    elif k == ord('e'):  # dynamic pitch control
         forward_analytics_call(analytics_display.dynamic_pitch_control, pitch, match, min(
             120, int(frame_id / fps_rate)), fps_rate, constants.POSITION_SMOOTHING_AVG_WINDOW)
-    elif k == ord('f'):
+    elif k == ord('f'):  # Switch full screen mode
         view.switch_screen_mode()  # Switch between normal and full mode
     elif k == ord('h'):  # heat map for each player
         print(f"Please enter player id: ")
@@ -71,18 +71,18 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
         except ValueError:
             print(f"Wrong input, please restart your calculations...")
             time.sleep(2)
-    elif k == ord('j'):
+    elif k == ord('j'):  # rewind back the video
         seek_frames = -5 * fps_rate
-    elif k == ord('l'):
+    elif k == ord('l'):  # rewind forward the video
         seek_frames = 5 * fps_rate
-    elif k == ord('m'):
+    elif k == ord('m'):  # whether to save highlights of the match or not
         game_situations.switch_mode()
-    elif k == ord('p'):
+    elif k == ord('p'):  # pause visualization
         utils.pause()  # Pause visualization
     elif k == ord('r'):  # total run
         forward_analytics_call(analytics_display.show_match_total_run,
                                pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
-    elif k == ord('s'):
+    elif k == ord('s'):  # switch view mode
         view.switch_draw_mode()  # Switch drawing mode between circles and ids
     elif k == ord('t'):  # sprints
         forward_analytics_call(analytics_display.show_match_sprint_summary,

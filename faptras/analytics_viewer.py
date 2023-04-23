@@ -21,7 +21,6 @@ import team
 import constants
 
 
-
 class AnalyticsViewer:
 
     def estimate_player_speed(self, pitch: pitch.Pitch, player: person.Player, video_fps_rate: int, window: int) -> np.array:
@@ -119,18 +118,19 @@ class AnalyticsViewer:
         axs[1].set_xticklabels(team2_players_id, rotation=65)
         axs[1].bar_label(team2_plot)
         plt.show()
-       
+
     def calculate_nearest_teammate_distance(self, team_positions: List[Tuple[float, float]]):
         min_dist = None
         for i in range(len(team_positions)):
             for j in range(len(team_positions)):
                 if i == j:
                     continue
-                dist = np.sqrt(abs(team_positions[i][0] - team_positions[j][0])**2 + abs(team_positions[i][1] - team_positions[j][1])**2)
+                dist = np.sqrt(abs(team_positions[i][0] - team_positions[j][0])**2 + abs(
+                    team_positions[i][1] - team_positions[j][1])**2)
                 if min_dist is None or dist < min_dist:
                     min_dist = dist
         return min_dist
-     
+
     def dynamic_pitch_control(self, pitch: pitch.Pitch, match: match.Match, seconds_to_visualize: int, video_fps_rate: int, window: int) -> List[Tuple[float, float]]:
         draw_pitch = mplsoccer.pitch.Pitch()
         frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
@@ -147,16 +147,18 @@ class AnalyticsViewer:
             team2_positions_extracted = [player_positions[frame]
                                          for player_positions in team2_positions if frame < player_positions.shape[0]]
             # Get Voronoi polygons
-            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+            team1_x_positions, team1_y_positions = self.get_mplsoccer_positions(
                 pitch, team1_positions_extracted)
-            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+            team2_x_positions, team2_y_positions = self.get_mplsoccer_positions(
                 pitch, team2_positions_extracted)
             team1, team2 = draw_pitch.voronoi(team1_x_positions + team2_x_positions, team1_y_positions + team2_y_positions,
                                               [True for _ in range(len(team1_positions_extracted))] + [False for _ in range(len(team2_positions_extracted))])
             team1_areas = [Polygon(polygon).area for polygon in team1]
             team2_areas = [Polygon(polygon).area for polygon in team2]
-            team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
-            team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
+            team1_area_ratio = sum(team1_areas) / \
+                (sum(team1_areas) + sum(team2_areas))
+            team2_area_ratio = sum(team2_areas) / \
+                (sum(team1_areas) + sum(team2_areas))
             team1_pitch_area.append(team1_area_ratio)
             team2_pitch_area.append(team2_area_ratio)
             if len(team1_positions_extracted) != 11 or len(team2_positions_extracted) != 11:
@@ -167,11 +169,14 @@ class AnalyticsViewer:
                     position), team1_positions_extracted))
                 team2_positions_extracted_meters = list(map(lambda position: pitch.pixel_to_meters_positions(
                     position), team2_positions_extracted))
-                team1_min_distances.append(self.calculate_nearest_teammate_distance(team1_positions_extracted_meters))
-                team2_min_distances.append(self.calculate_nearest_teammate_distance(team2_positions_extracted_meters))
-                        
+                team1_min_distances.append(self.calculate_nearest_teammate_distance(
+                    team1_positions_extracted_meters))
+                team2_min_distances.append(self.calculate_nearest_teammate_distance(
+                    team2_positions_extracted_meters))
+
         _, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 10))
-        minutes = np.arange(frames_to_visualize)/ (video_fps_rate * 60)  # discard the first time sample
+        # discard the first time sample
+        minutes = np.arange(frames_to_visualize) / (video_fps_rate * 60)
         minutes = minutes[::10]
         team1_min_distances = team1_min_distances[::10]
         team2_min_distances = team2_min_distances[::10]
@@ -439,7 +444,7 @@ class AnalyticsViewer:
         draw_pitch.draw(ax=axs[0], tight_layout=False,
                         constrained_layout=True, figsize=(8, 5))
         # Get positions
-        x_positions, y_positions = self.get_team_mplsoccer_positions(
+        x_positions, y_positions = self.get_mplsoccer_positions(
             pitch, player.all_positions.values())
         # Start drawing heatmap
         bin_statistic = draw_pitch.bin_statistic(
@@ -469,7 +474,7 @@ class AnalyticsViewer:
                            cmap=flamingo_cmap)
         plt.show()
 
-    def draw_convex_hull_for_players(self, pitch: pitch.Pitch, team: team.Team, current_frame: int, left: bool):
+    def draw_convex_hull_for_players(self, match: match.Match, pitch: pitch.Pitch, team: team.Team, current_frame: int, left: bool):
         """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper is ignored.
         Left represents the side on which is the goalkeeper.
         """
@@ -478,7 +483,7 @@ class AnalyticsViewer:
             player.current_position for player in team.players if player.last_seen_frame_id == current_frame]
         team_ids = [
             player.name for player in team.players if player.last_seen_frame_id == current_frame]
-        x_positions, y_positions = self.get_team_mplsoccer_positions(
+        x_positions, y_positions = self.get_mplsoccer_positions(
             pitch, positions)
         if left:
             # Then the goalkeeper is on the left side so we should remove the min x player
@@ -492,14 +497,18 @@ class AnalyticsViewer:
         del y_positions[index_to_remove]
         del team_ids[index_to_remove]
         # Draw the pitch
-        pitch = mplsoccer.pitch.Pitch()
-        fig, ax = pitch.draw(figsize=(8, 6))
+        draw_pitch = mplsoccer.pitch.Pitch()
+        fig, ax = draw_pitch.draw(figsize=(8, 6))
         fig.suptitle(f"{team.name}'s convex hull", color="black", fontsize=30)
-        hull = pitch.convexhull(x_positions, y_positions)
-        pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue',
+        hull = draw_pitch.convexhull(x_positions, y_positions)
+        draw_pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue',
                       facecolor='cornflowerblue', alpha=0.3)
-        pitch.scatter(x_positions, y_positions, ax=ax,
+        draw_pitch.scatter(x_positions, y_positions, ax=ax,
                       edgecolor='black', facecolor='cornflowerblue')
+                # Draw the ball on the Voronoi diagram
+        ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
+                pitch, [match.ball.current_position])
+        draw_pitch.scatter(ball_x_positions, ball_y_positions, c='black', s=80, ax=ax)
         for i, player_id in enumerate(team_ids):
             ax.text(x_positions[i] + 1.5, y_positions[i] +
                     1.5, player_id, color="black")
@@ -522,6 +531,7 @@ class AnalyticsViewer:
             frames_to_visualize_pad, window)
         team2_positions, team2_ids = match.team2.get_last_n_player_positions(
             frames_to_visualize_pad, window)
+        ball_positions = match.ball.get_last_n_positions(frames_to_visualize_pad, window)
 
         # Prepare text plots
         team1_text, team2_text = [], []
@@ -531,10 +541,13 @@ class AnalyticsViewer:
             team2_text.append(axs_voronoi[0].annotate(
                 team2_ids[i], (0, 0), color="black"))
         # Prepare scatter plot
-        marker_kwargs = {'marker': 'o', 'markeredgecolor': 'black', 'linestyle': 'None'}
+        marker_kwargs = {'marker': 'o',
+                         'markeredgecolor': 'black', 'linestyle': 'None'}
         scatter_team_1, = axs_voronoi[0].plot(
             [], [], ms=6, markerfacecolor='black', **marker_kwargs)
         scatter_team_2, = axs_voronoi[0].plot(
+            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
+        ball, = axs_voronoi[0].plot(
             [], [], ms=6, markerfacecolor='black', **marker_kwargs)
         # Prepare polygons
         draw_pitch.polygon([], ax=axs_voronoi[0], fc='yellow',
@@ -556,17 +569,16 @@ class AnalyticsViewer:
                                          for player_positions in team1_positions if frame < player_positions.shape[0]]
             team2_positions_extracted = [player_positions[frame]
                                          for player_positions in team2_positions if frame < player_positions.shape[0]]
+            ball_positions_extracted = (ball_positions[frame]) if frame < ball_positions.shape[0] else ()
+            
             # Extract x and y positions
-            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+            team1_x_positions, team1_y_positions = self.get_mplsoccer_positions(
                 pitch, team1_positions_extracted)
-            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+            team2_x_positions, team2_y_positions = self.get_mplsoccer_positions(
                 pitch, team2_positions_extracted)
             # Calculate voronoi polygons
             team1, team2 = draw_pitch.voronoi(team1_x_positions + team2_x_positions, team1_y_positions + team2_y_positions,
                                               [True for _ in range(len(team1_positions))] + [False for _ in range(len(team2_y_positions))])
-            # Update scatter plot
-            scatter_team_1.set_data(team1_x_positions, team1_y_positions)
-            scatter_team_2.set_data(team2_x_positions, team2_y_positions)
             # Update text
             for i in range(11):
                 team1_text[i].set_position(
@@ -580,18 +592,32 @@ class AnalyticsViewer:
             for team2_polygon in team2:
                 axs_voronoi[0].fill(*zip(*team2_polygon), 'red')
                 axs_voronoi[0].plot(*zip(*team2_polygon), 'black', lw=1)
+
+            axs_voronoi[0].plot(team1_x_positions, team1_y_positions,
+                                ms=6, markerfacecolor='yellow', **marker_kwargs)
+            axs_voronoi[0].plot(team2_x_positions, team2_y_positions,
+                                ms=6, markerfacecolor='red', **marker_kwargs)
             
-            axs_voronoi[0].plot(team1_x_positions, team1_y_positions, ms=6, markerfacecolor='black', **marker_kwargs)
-            axs_voronoi[0].plot(team2_x_positions, team2_y_positions, ms=6, markerfacecolor='black', **marker_kwargs)
-            
-            # Update ratio of area covered 
+            # Update ball position
+            if len(ball_positions_extracted):
+                ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
+                    pitch, [ball_positions_extracted])
+                axs_voronoi[0].plot(ball_x_positions, ball_y_positions,
+                                    ms=6, markerfacecolor='black', **marker_kwargs)
+
+            # Update ratio of area covered
             team1_areas = [Polygon(polygon).area for polygon in team1]
             team2_areas = [Polygon(polygon).area for polygon in team2]
-            team1_area_ratio = sum(team1_areas) / (sum(team1_areas) + sum(team2_areas))
-            team2_area_ratio = sum(team2_areas) / (sum(team1_areas) + sum(team2_areas))
+            team1_area_ratio = sum(team1_areas) / \
+                (sum(team1_areas) + sum(team2_areas))
+            team2_area_ratio = sum(team2_areas) / \
+                (sum(team1_areas) + sum(team2_areas))
             ratios = [team1_area_ratio, team2_area_ratio]
             for i, rect in enumerate(axs_voronoi[1].patches):
                 rect.set_height(ratios[i])
+                
+                            
+                
             return axs_voronoi[0], axs_voronoi[1], *team1_text, *team2_text
 
         anim = animation.FuncAnimation(
@@ -606,13 +632,13 @@ class AnalyticsViewer:
             player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
         team1_ids = [
             player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
-        team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
+        team1_x_positions, team1_y_positions = self.get_mplsoccer_positions(
             pitch, team1_positions)
         team2_positions = [
             player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
         team2_ids = [
             player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
-        team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
+        team2_x_positions, team2_y_positions = self.get_mplsoccer_positions(
             pitch, team2_positions)
         # Draw pitch
         draw_pitch = mplsoccer.pitch.Pitch()
@@ -650,6 +676,11 @@ class AnalyticsViewer:
         for i, player_id in enumerate(team2_ids):
             axs_voronoi[0].text(
                 team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5, player_id, color="black")
+        # Draw the ball on the Voronoi diagram
+        ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
+                pitch, [match.ball.current_position])
+        draw_pitch.scatter(ball_x_positions, ball_y_positions, c='black', s=80, ax=axs_voronoi[0])
+
         plt.show()
 
     def draw_delaunay_tessellation(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
@@ -694,7 +725,8 @@ class AnalyticsViewer:
                         f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
                     self.draw_positions_tessellation_helper(
                         draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
-                ax.scatter(ball_x_positions, ball_y_positions, c="black", s=70, zorder=10)
+                ax.scatter(ball_x_positions, ball_y_positions,
+                           c="black", s=70, zorder=10)
                 fig.canvas.draw()
 
         fig.canvas.mpl_connect('key_press_event', lambda event: press(event))
@@ -705,15 +737,16 @@ class AnalyticsViewer:
             draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
         self.draw_positions_tessellation_helper(
             draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
-        ball_x_positions, ball_y_positions = self.get_team_mplsoccer_positions(
+        ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
             pitch, [match.ball.current_position])
-        ax.scatter(ball_x_positions, ball_y_positions, c="black", s=70, zorder=10)
+        ax.scatter(ball_x_positions, ball_y_positions,
+                   c="black", s=70, zorder=10)
         plt.show()
 
     def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, team_ids: List, color, ax):
         """Helper method for tessellation."""
         draw_pitch.draw(figsize=(8, 6), ax=ax)
-        team_x_positions, team_y_positions = self.get_team_mplsoccer_positions(
+        team_x_positions, team_y_positions = self.get_mplsoccer_positions(
             pitch, team_positions)
         draw_pitch.triplot(team_x_positions, team_y_positions,
                            color=color, linewidth=2, ax=ax)
@@ -723,8 +756,8 @@ class AnalyticsViewer:
             ax.text(
                 team_x_positions[i] + 1.5, team_y_positions[i] + 1.5, player_id, color=color)
 
-    def get_team_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
-        """Helper method to extract team positions and transform them into the mplsoccer friendly format."""
+    def get_mplsoccer_positions(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]]):
+        """Helper method to transform positions them into the mplsoccer friendly format."""
         team_positions: Tuple[float, float] = list(
             map(lambda position: pitch.normalize_pixel_position(position), team_positions))
         team_x_positions = list(map(

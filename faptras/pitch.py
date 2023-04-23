@@ -49,7 +49,6 @@ class Pitch:
         Returns:
             Normalized coordinates
         """
-        print(f"Pixel coords: {pixel_coords} UL: {self.upper_left_corner} LR: {self.down_right_corner} length: {self.length} width: {self.width}")
         if self.x_dim == PitchOrientation.LENGTH:
             return (pixel_coords[0] - self.upper_left_corner[0]) / self.length, (pixel_coords[1] - self.upper_left_corner[1]) / self.width
         return (pixel_coords[0] - self.upper_left_corner[0]) / self.width, (pixel_coords[1] - self.upper_left_corner[1]) / self.length
