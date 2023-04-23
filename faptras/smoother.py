@@ -21,11 +21,11 @@ class SmootherPosition(abc.ABC):
             self.x_window.append(new_position[0])
             self.y_window.append(new_position[1])
             return new_position
-        player_positions = np.array([self.x_window, self.y_window])
+        positions = np.array([self.x_window, self.y_window])
         window = np.ones(constants.POSITION_SMOOTHING_AVG_WINDOW) / \
             constants.POSITION_SMOOTHING_AVG_WINDOW
         player_smoothed_positions = np.apply_along_axis(lambda dim: np.convolve(
-            dim, window, mode="valid"), axis=1, arr=player_positions)
+            dim, window, mode="valid"), axis=1, arr=positions)
         self.x_window.popleft()
         self.y_window.popleft()
         self.x_window.append(new_position[0])

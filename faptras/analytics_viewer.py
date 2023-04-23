@@ -505,64 +505,6 @@ class AnalyticsViewer:
                     1.5, player_id, color="black")
         plt.show()
 
-    def visualize_animation(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
-        """Visualizes last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
-        # Drawing setup
-        draw_pitch = mplsoccer.pitch.Pitch()
-        fig, ax = draw_pitch.draw(figsize=(8, 6))
-        frames_to_visualize = seconds_to_visualize * constants.FPS_ANIMATIONS
-        fig.suptitle(
-            f"Visualizing last {seconds_to_visualize} seconds", color="black", fontsize=30)
-        frames_to_visualize_pad = frames_to_visualize + window - 1
-        print(f"Frames to visualize: {frames_to_visualize}")
-        # Setup markers to visualization
-        # Assume that home is team1
-        # Away is team2
-        marker_kwargs = {'marker': 'o', 'markeredgecolor': 'black', 'linestyle': 'None'}
-        home, = ax.plot([], [], ms=10, markerfacecolor="blue",
-                        **marker_kwargs)  # purple
-        away, = ax.plot([], [], ms=10, markerfacecolor="red", **marker_kwargs)
-
-        team1_positions, team1_ids = match.team1.get_last_n_player_positions(
-            frames_to_visualize_pad, window)
-        team2_positions, team2_ids = match.team2.get_last_n_player_positions(
-            frames_to_visualize_pad, window)
-
-        team1_text, team2_text = [], []
-        for i in range(11):
-            team1_text.append(ax.annotate(team1_ids[i], (0, 0), color="black"))
-            team2_text.append(ax.annotate(team2_ids[i], (0, 0), color="black"))
-
-        def animate(frame):
-            """Function used for animation. Sets data position for players."""
-            team1_positions_extracted = [player_positions[frame]
-                                         for player_positions in team1_positions if frame < player_positions.shape[0]]
-            team2_positions_extracted = [player_positions[frame]
-                                         for player_positions in team2_positions if frame < player_positions.shape[0]]
-
-            team1_x_positions, team1_y_positions = self.get_team_mplsoccer_positions(
-                pitch, team1_positions_extracted)
-            team2_x_positions, team2_y_positions = self.get_team_mplsoccer_positions(
-                pitch, team2_positions_extracted)
-
-            home.set_data(team1_x_positions, team1_y_positions)
-            away.set_data(team2_x_positions, team2_y_positions)
-
-            for i in range(11):
-                team1_text[i].set_position(
-                    (team1_x_positions[i] + 1.5, team1_y_positions[i] + 1.5))
-                team2_text[i].set_position(
-                    (team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5))
-
-            return home, away, *team1_text, *team2_text
-
-        # call the animator, animate so 25 frames per second
-        # must not remove anim!
-        anim = animation.FuncAnimation(
-            fig, animate, frames=frames_to_visualize, interval=25, blit=True)
-        # anim.save("switch_positions.mp4")
-        plt.show()
-
     def draw_dynamic_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
         """Draws pitch control for the last "seconds_to_visualize" seconds of the match starting from the "current_frame" """
         fig_voronoi, axs_voronoi = plt.subplots(
@@ -596,9 +538,9 @@ class AnalyticsViewer:
             [], [], ms=6, markerfacecolor='black', **marker_kwargs)
         # Prepare polygons
         draw_pitch.polygon([], ax=axs_voronoi[0], fc='yellow',
-                                             ec='black', lw=3, alpha=0.4)
+                           ec='black', lw=3, alpha=0.4)
         draw_pitch.polygon([], ax=axs_voronoi[0], fc='red',
-                                             ec='black', lw=3, alpha=0.4)
+                           ec='black', lw=3, alpha=0.4)
         # Prepare ratio of area covered
         axs_voronoi[1].bar([match.team1.name, match.team2.name], [0.5, 0.5])
         axs_voronoi[1].set_ylim([0, 1])
@@ -752,6 +694,7 @@ class AnalyticsViewer:
                         f"Delaunay's tessellation of team {match.team1.name}", color="black", fontsize=30)
                     self.draw_positions_tessellation_helper(
                         draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
+                ax.scatter(ball_x_positions, ball_y_positions, c="black", s=70, zorder=10)
                 fig.canvas.draw()
 
         fig.canvas.mpl_connect('key_press_event', lambda event: press(event))
@@ -762,6 +705,9 @@ class AnalyticsViewer:
             draw_pitch, pitch, team1_positions, team1_ids, "blue", ax)
         self.draw_positions_tessellation_helper(
             draw_pitch, pitch, team2_positions, team2_ids, "red", ax)
+        ball_x_positions, ball_y_positions = self.get_team_mplsoccer_positions(
+            pitch, [match.ball.current_position])
+        ax.scatter(ball_x_positions, ball_y_positions, c="black", s=70, zorder=10)
         plt.show()
 
     def draw_positions_tessellation_helper(self, draw_pitch, pitch: pitch.Pitch, team_positions, team_ids: List, color, ax):

@@ -37,9 +37,6 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     seek_frames = 0
     if k == ord('q'):
         return True, seek_frames  # Quit visualization
-    elif k == ord('a'):  # animations
-        forward_analytics_call(analytics_display.visualize_animation, match, pitch, min(
-            5, int(frame_id / fps_rate)), constants.POSITION_SMOOTHING_AVG_WINDOW)
     elif k == ord('b'):
         forward_analytics_call(analytics_display.show_match_acc_summary,
                                pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
