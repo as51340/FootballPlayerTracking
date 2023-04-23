@@ -41,20 +41,8 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
         forward_analytics_call(analytics_display.show_match_acc_summary,
                                pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('c'):  # convex hull for a team
-        print("Please enter team's name: ")
-        team_name = input()
-        team, left = None, True  # on which side is the team's goalkeeper
-        if team_name == match.team1.name:
-            team = match.team1
-        elif team_name == match.team2.name:
-            team = match.team2
-            left = False
-        else:
-            print(f"Unknown team, please start calculations again...")
-            time.sleep(2)
-        if team is not None:
-            forward_analytics_call(
-                analytics_display.draw_convex_hull_for_players, match, pitch, team, frame_id, left)
+        forward_analytics_call(
+            analytics_display.draw_convex_hull_for_players, match, pitch, frame_id)
     elif k == ord('d'):  # delaunay tessellation
         forward_analytics_call(
             analytics_display.draw_delaunay_tessellation, match, pitch, frame_id)

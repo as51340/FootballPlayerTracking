@@ -474,17 +474,9 @@ class AnalyticsViewer:
                            cmap=flamingo_cmap)
         plt.show()
 
-    def draw_convex_hull_for_players(self, match: match.Match, pitch: pitch.Pitch, team: team.Team, current_frame: int, left: bool):
-        """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper is ignored.
-        Left represents the side on which is the goalkeeper.
-        """
-        # Extract positons
-        positions = [
-            player.current_position for player in team.players if player.last_seen_frame_id == current_frame]
-        team_ids = [
-            player.name for player in team.players if player.last_seen_frame_id == current_frame]
+    def draw_convex_hull_for_team(self, pitch: pitch.Pitch, team_positions: List[Tuple[float, float]], team_ids: List[str], team_name: str, ball_x_positions: List[float], ball_y_positions: List[float], left: bool) -> None:
         x_positions, y_positions = self.get_mplsoccer_positions(
-            pitch, positions)
+            pitch, team_positions)
         if left:
             # Then the goalkeeper is on the left side so we should remove the min x player
             index_to_remove = min(range(len(x_positions)),
@@ -499,19 +491,36 @@ class AnalyticsViewer:
         # Draw the pitch
         draw_pitch = mplsoccer.pitch.Pitch()
         fig, ax = draw_pitch.draw(figsize=(8, 6))
-        fig.suptitle(f"{team.name}'s convex hull", color="black", fontsize=30)
+        fig.suptitle(f"{team_name}'s convex hull", color="black", fontsize=30)
         hull = draw_pitch.convexhull(x_positions, y_positions)
         draw_pitch.polygon(hull, ax=ax, edgecolor='cornflowerblue',
-                      facecolor='cornflowerblue', alpha=0.3)
+                           facecolor='cornflowerblue', alpha=0.3)
         draw_pitch.scatter(x_positions, y_positions, ax=ax,
-                      edgecolor='black', facecolor='cornflowerblue')
-                # Draw the ball on the Voronoi diagram
-        ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
-                pitch, [match.ball.current_position])
-        draw_pitch.scatter(ball_x_positions, ball_y_positions, c='black', s=80, ax=ax)
+                           edgecolor='black', facecolor='cornflowerblue')
         for i, player_id in enumerate(team_ids):
             ax.text(x_positions[i] + 1.5, y_positions[i] +
                     1.5, player_id, color="black")
+        # Draw the ball on the Voronoi diagram
+        draw_pitch.scatter(ball_x_positions, ball_y_positions,
+                           c='black', s=80, ax=ax)
+
+    def draw_convex_hull_for_players(self, match: match.Match, pitch: pitch.Pitch, current_frame: int):
+        """Draws convex hull around players of the given team. Such info can be useful for seeing space coverage. Goalkeeper is ignored.
+        Left represents the side on which is the goalkeeper.
+        """
+        # Extract positons
+        team1_positions = [
+            player.current_position for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team1_ids = [
+            player.name for player in match.team1.players if player.last_seen_frame_id == current_frame]
+        team2_positions = [
+            player.current_position for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        team2_ids = [
+            player.name for player in match.team2.players if player.last_seen_frame_id == current_frame]
+        ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
+            pitch, [match.ball.current_position])
+        self.draw_convex_hull_for_team(pitch, team1_positions, team1_ids, match.team1.name, ball_x_positions, ball_y_positions, True)
+        self.draw_convex_hull_for_team(pitch, team2_positions, team2_ids, match.team2.name, ball_x_positions, ball_y_positions, False)
         plt.show()
 
     def draw_dynamic_voronoi_diagrams(self, match: match.Match, pitch: pitch.Pitch, seconds_to_visualize: int, window: int):
@@ -531,7 +540,8 @@ class AnalyticsViewer:
             frames_to_visualize_pad, window)
         team2_positions, team2_ids = match.team2.get_last_n_player_positions(
             frames_to_visualize_pad, window)
-        ball_positions = match.ball.get_last_n_positions(frames_to_visualize_pad, window)
+        ball_positions = match.ball.get_last_n_positions(
+            frames_to_visualize_pad, window)
 
         # Prepare text plots
         team1_text, team2_text = [], []
@@ -543,12 +553,6 @@ class AnalyticsViewer:
         # Prepare scatter plot
         marker_kwargs = {'marker': 'o',
                          'markeredgecolor': 'black', 'linestyle': 'None'}
-        scatter_team_1, = axs_voronoi[0].plot(
-            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
-        scatter_team_2, = axs_voronoi[0].plot(
-            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
-        ball, = axs_voronoi[0].plot(
-            [], [], ms=6, markerfacecolor='black', **marker_kwargs)
         # Prepare polygons
         draw_pitch.polygon([], ax=axs_voronoi[0], fc='yellow',
                            ec='black', lw=3, alpha=0.4)
@@ -569,8 +573,9 @@ class AnalyticsViewer:
                                          for player_positions in team1_positions if frame < player_positions.shape[0]]
             team2_positions_extracted = [player_positions[frame]
                                          for player_positions in team2_positions if frame < player_positions.shape[0]]
-            ball_positions_extracted = (ball_positions[frame]) if frame < ball_positions.shape[0] else ()
-            
+            ball_positions_extracted = (
+                ball_positions[frame]) if frame < ball_positions.shape[0] else ()
+
             # Extract x and y positions
             team1_x_positions, team1_y_positions = self.get_mplsoccer_positions(
                 pitch, team1_positions_extracted)
@@ -597,7 +602,7 @@ class AnalyticsViewer:
                                 ms=6, markerfacecolor='yellow', **marker_kwargs)
             axs_voronoi[0].plot(team2_x_positions, team2_y_positions,
                                 ms=6, markerfacecolor='red', **marker_kwargs)
-            
+
             # Update ball position
             if len(ball_positions_extracted):
                 ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
@@ -615,9 +620,7 @@ class AnalyticsViewer:
             ratios = [team1_area_ratio, team2_area_ratio]
             for i, rect in enumerate(axs_voronoi[1].patches):
                 rect.set_height(ratios[i])
-                
-                            
-                
+
             return axs_voronoi[0], axs_voronoi[1], *team1_text, *team2_text
 
         anim = animation.FuncAnimation(
@@ -678,8 +681,9 @@ class AnalyticsViewer:
                 team2_x_positions[i] + 1.5, team2_y_positions[i] + 1.5, player_id, color="black")
         # Draw the ball on the Voronoi diagram
         ball_x_positions, ball_y_positions = self.get_mplsoccer_positions(
-                pitch, [match.ball.current_position])
-        draw_pitch.scatter(ball_x_positions, ball_y_positions, c='black', s=80, ax=axs_voronoi[0])
+            pitch, [match.ball.current_position])
+        draw_pitch.scatter(ball_x_positions, ball_y_positions,
+                           c='black', s=80, ax=axs_voronoi[0])
 
         plt.show()
 
