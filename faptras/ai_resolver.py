@@ -34,7 +34,7 @@ class Resolver:
         """
         self.fps = fps
 
-    def resolve(self, pitch_, match_: match.Match, new_objects_detection, new_objects_bb, new_objects_id: List[int], existing_objects_detection, existing_objects_bb, existing_objects_id: List[int], frame_id: int):
+    def resolve(self, pitch_, match_: match.Match, missing_ids_from_start: List[int], new_objects_detection, new_objects_bb, new_objects_id: List[int], existing_objects_detection, existing_objects_bb, existing_objects_id: List[int], frame_id: int):
         """
 
         Args:
@@ -54,9 +54,6 @@ class Resolver:
         print(f"Started resolvement process in frame {frame_id}")
         result = ResolvingInfo()
 
-        # All ids that are in the match from the start but not in the known objects
-        missing_ids_from_start = [
-            id_ for id_ in match_.initial_ids if id_ not in existing_objects_id]
         if len(new_objects_id) == 1 and len(missing_ids_from_start) == 1:
             # It means we found that player
             print(

@@ -21,8 +21,7 @@ class Person(SmootherPosition):
         super().__init__()
         self.name = name
         self.ids: List[int] = [initial_id]
-        # in 2D space in pixels
-        self.current_position: Tuple[float, float] = initial_position
+        self.current_position: Tuple[float, float] = initial_position  # in 2D space in pixels
         self.sum_pos_x, self.sum_pos_y = initial_position_meters  # in meters
         self.total_times_seen = 1
         # the first frame is removed because it is used for analytical purposes

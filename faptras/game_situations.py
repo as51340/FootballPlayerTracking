@@ -20,6 +20,8 @@ class GameSituations:
     
     def switch_mode(self):
         if self.situation_mode == SituationMode.NO_SAVE:
+            # Record few seconds before the situation
+            # TODO: don't just take any positions of players but rather the one that really correct, even if not correctly tracked.
             self.situation_mode = SituationMode.SAVE
         else:
             self.situation_mode = SituationMode.NO_SAVE

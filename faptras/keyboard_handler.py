@@ -37,7 +37,7 @@ def handle_key_press(k, view: view.View, analytics_display: analytics_viewer.Ana
     seek_frames = 0
     if k == ord('q'):
         return True, seek_frames  # Quit visualization
-    elif k == ord('b'):
+    elif k == ord('b'):  # match acc summary
         forward_analytics_call(analytics_display.show_match_acc_summary,
                                pitch, match, fps_rate, constants.SMOOTHING_AVG_WINDOW)
     elif k == ord('c'):  # convex hull for a team

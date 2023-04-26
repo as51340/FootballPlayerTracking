@@ -108,6 +108,46 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
         # This should probably be somehow optimized
         detections_in_pitch, bb_info_in_pitch, objects_id_in_pitch, classes_in_pitch = sanitizer.clear_already_resolved(
             *pitch.get_objects_within(detections_per_frame, bb_info, object_ids, classes), resolving_positions_cache)
+        
+        
+        # All ids that are in the match from the start but not in the known objects
+        missing_ids_from_start = [
+            id_ for id_ in match.initial_ids if id_ not in objects_id_in_pitch]
+        
+        maybe_switched_persons = []
+        maybe_switched_ids = []
+        maybe_switched_distances = []
+        maybe_switched_frame_detections = []
+        for i, frame_detection in enumerate(detections_in_pitch):
+            person = match.find_person_with_id(objects_id_in_pitch[i])
+            if person == None:
+                continue
+            dist = utils.calculate_euclidean_distance(pitch.pixel_to_meters_positions(person.current_position), pitch.pixel_to_meters_positions(frame_detection))
+            if dist > 2 and frame_id == person.last_seen_frame_id + 1:
+                print(f"Frame: {frame_id} Distance {dist} Person {objects_id_in_pitch[i]} Last position {person.current_position} New position {frame_detection} Missing ids: {missing_ids_from_start}")
+                maybe_switched_persons.append(person)
+                maybe_switched_ids.append(i)
+                maybe_switched_distances.append(dist)
+                maybe_switched_frame_detections.append(frame_detection)
+        if len(maybe_switched_persons) == 1:
+            del detections_in_pitch[maybe_switched_ids[0]]
+            del bb_info_in_pitch[maybe_switched_ids[0]]
+            del objects_id_in_pitch[maybe_switched_ids[0]]
+            del classes_in_pitch[maybe_switched_ids[0]]
+        elif len(maybe_switched_persons) == 2:
+            # Distance between first player and second detection
+            switched_dist_1 = utils.calculate_euclidean_distance(pitch.pixel_to_meters_positions(maybe_switched_persons[0].current_position), pitch.pixel_to_meters_positions(maybe_switched_frame_detections[1]));
+            # Distance between second player and first detection
+            switched_dist_2 = utils.calculate_euclidean_distance(pitch.pixel_to_meters_positions(maybe_switched_persons[1].current_position), pitch.pixel_to_meters_positions(maybe_switched_frame_detections[0]));
+            if switched_dist_1 < maybe_switched_distances[0] and switched_dist_2 < maybe_switched_distances[1]:
+                print(f"Switching persons: {objects_id_in_pitch[maybe_switched_ids[0]]} {objects_id_in_pitch[maybe_switched_ids[1]]} {objects_id_in_pitch}")
+                tmp = objects_id_in_pitch[maybe_switched_ids[0]]
+                objects_id_in_pitch[maybe_switched_ids[0]] = objects_id_in_pitch[maybe_switched_ids[1]]
+                objects_id_in_pitch[maybe_switched_ids[1]] = tmp
+                print(objects_id_in_pitch)
+                print()
+        
+        
         # Check whether we will have to deal with new object in this frame
         # New objects can be only persons, not the ball
         new_objects_detection, new_objects_bb, new_objects_id, ball_id = match.get_new_objects(
@@ -121,7 +161,8 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
         else:
             assert set(existing_objects_id).union(
                 set(new_objects_id), set([ball_id])) == set(objects_id_in_pitch)
-
+        
+            
         # But if it is caching just try to get all ids from the cache
         if cache_resolving:
             for detection_info_new_id, bb_info_new_id, new_obj_id in zip(new_objects_detection, new_objects_bb, new_objects_id):
@@ -132,7 +173,7 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
             # Ask resolver for the help
             if len(new_objects_id):
                 resolving_info: ai_resolver.ResolvingInfo = resolver.resolve(
-                    pitch, match, new_objects_detection, new_objects_bb, new_objects_id, existing_objects_detection, existing_objects_bb, existing_objects_id, frame_id)
+                    pitch, match, missing_ids_from_start, new_objects_detection, new_objects_bb, new_objects_id, existing_objects_detection, existing_objects_bb, existing_objects_id, frame_id)
                 # Resolve action for all resolved objects
                 for i in range(len(resolving_info.resolved_ids)):
                     match.resolve_user_action(resolving_info.found_ids[i], resolving_info.resolved_ids[i], resolving_info.resolved_detections[
@@ -199,6 +240,7 @@ def play_visualizations(view: View, pitch: Pitch, match: Match, detections_stora
             else:
                 person, person_color, id_to_show = match.get_info_for_drawing(
                     objects_id_in_pitch[i])
+
                 person.last_seen_frame_id = frame_id
 
                 # Validation step
@@ -267,10 +309,10 @@ def play_analysis(view: View, pitch: Pitch, path_to_pitch: str, path_to_video: s
     game_situations = GameSituations(width_orig, height_orig, fps_rate)
     if save_video:
         write_orig = cv.VideoWriter('bboxes.mp4', cv.VideoWriter_fourcc(
-            *'mp4v'), 30, (width_orig, height_orig))
+            *'mp4v'), fps_rate, (width_orig, height_orig))
         height_det, width_det, _ = pitch_img.shape
         write_det = cv.VideoWriter('detections.mp4', cv.VideoWriter_fourcc(
-            *'mp4v'), 30, (width_det, height_det))
+            *'mp4v'), fps_rate, (width_det, height_det))
     else:
         write_orig, write_det = None, None
 

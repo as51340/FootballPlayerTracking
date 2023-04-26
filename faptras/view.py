@@ -25,7 +25,7 @@ class View:
     def __init__(self, view_mode: ViewMode) -> None:
         self.last_clicked_windows = []
         self.view_mode = view_mode
-        self.draw_mode = DrawMode.TEXT
+        self.draw_mode = DrawMode.ID
 
     def switch_screen_mode(self):
         """Switches screen mode
