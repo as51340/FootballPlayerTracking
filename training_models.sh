@@ -1,3 +1,7 @@
+# ------------------------------------------------------------- #
+# Script to evalulate the performance of the trained models.    #
+# ------------------------------------------------------------- #
+
 #!/bin/bash
 
 models=("yolov5s.pt")

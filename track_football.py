@@ -1,3 +1,8 @@
+# --------------------------------------------------------------- #
+# Modification to original track.py made at the beginning of the  # 
+# project but now unused and discarded.                           #
+# --------------------------------------------------------------- #
+
 import argparse
 
 import os

@@ -1,9 +1,12 @@
+# ----------------------------------------------------------------------------- #
+# Performs conversion from MOT16 format to yolov5 pytorch format.               #
+# ----------------------------------------------------------------------------- #
+
 import cv2
 
 FRAME_WIDTH = 3
 FRAME_HEIHGT = 4
 PLAYER_CLASS = 0
-
 
 def get_video_shape(path):
     vcap = cv2.VideoCapture(path)  # 0=camera
@@ -14,11 +17,9 @@ def get_video_shape(path):
     else:
         raise Exception("Video cannot be opened")
 
-
 def convert(video_path, mot16_file_path, roboflow_labels_dir):
     img_width, img_height = get_video_shape(video_path)
     print(f"Img width: {img_width} img height: {img_height}")
-    return
     with open(mot16_file_path, "r") as mot16:
         mot16_lines = mot16.readlines()
         for line in mot16_lines:

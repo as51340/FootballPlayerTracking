@@ -1,6 +1,10 @@
-# Script that is used to merge the data obtain from the tracker to append it to the new dataset.
-# Used for implementing so called self-learning
-# How to run: python self_learning.py --path-to-new-dataset /home/andi/FER/year5/FootballPlayerTracking/data/original_t16 --path-to-tracking-data /home/andi/FER/year5/FootballPlayerTracking/results/track/exp105/tracks/t16.txt --path-to-original-video /home/andi/FER/year5/FootballPlayerTracking/data/t16.mp4
+# -------------------------------------------------------------------------------------------------------------------------------------- #
+# Script that is used to merge the data obtain from the tracker                                                                          #
+# to append it to the new dataset. Used for implementing so called                                                                       #
+# self-learning. How to run: python self_learning.py --path-to-new-dataset /home/andi/FER/year5/FootballPlayerTracking/data/original_t16 # 
+# --path-to-tracking-data /home/andi/FER/year5/FootballPlayerTracking/results/track/exp105/tracks/t16.txt                                #
+# --path-to-original-video /home/andi/FER/year5/FootballPlayerTracking/data/t16.mp4                                                      # 
+# -------------------------------------------------------------------------------------------------------------------------------------- #
 
 
 import argparse
@@ -10,9 +14,9 @@ from pathlib import Path
 import cv2 as cv
 
 
-TRAIN_DATASET_RATIO = 0.7
-VALID_DATASET_RATIO = 0.2
-TEST_DATASET_RATIO = 0.1
+TRAIN_DATASET_RATIO = 0.9
+VALID_DATASET_RATIO = 0.1
+TEST_DATASET_RATIO = 0.0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="FAPTRAS: Football analysis player tracking software. Self-learning script.",

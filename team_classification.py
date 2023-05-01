@@ -1,3 +1,7 @@
+# ------------------------------------------------------------- #
+# Auxiliary functions for the classification of the teams.      #
+# ------------------------------------------------------------- #
+
 import numpy as np
 import cv2
 

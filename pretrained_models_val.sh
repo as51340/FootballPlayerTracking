@@ -1,3 +1,7 @@
+# ----------------------------------------------------------------------------- #
+# This script is used to evaluate the pretrained models on the validation set.  #
+# ----------------------------------------------------------------------------- #
+
 #!/bin/bash
 
 models=("yolov5s.pt" "yolov5n.pt" "yolov5m.pt" "yolov5l.pt" "yolov5x.pt" 

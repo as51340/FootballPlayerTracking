@@ -1,3 +1,7 @@
+# ----------------------------------------------------------------------------- #
+# Converts the detections from the original format to a numpy array.
+# ----------------------------------------------------------------------------- #
+
 import sys
 
 import numpy as np

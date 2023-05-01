@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------- #
+# Team classification run on top of track.py. Unused and discrded  #
+# at the moment.                                                   #
+# ---------------------------------------------------------------- #
+
 import argparse
 import cv2
 import os

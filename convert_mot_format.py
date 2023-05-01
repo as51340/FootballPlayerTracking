@@ -1,3 +1,7 @@
+# ----------------------------------------------------------------------------- #
+# Script used to modify the MOT format to the format used by TrackEval library. #
+# ----------------------------------------------------------------------------- #
+
 import sys
 
 def convert_file(path_to_file: str, path_to_save: str):

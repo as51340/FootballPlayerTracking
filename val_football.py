@@ -1,3 +1,8 @@
+# ------------------------------------------------------------- #
+# Modification of original val.py file with few changes but     #
+# generally the same and unused. Use val.py instead.            #
+# ------------------------------------------------------------- #
+
 import os
 import sys
 import torch

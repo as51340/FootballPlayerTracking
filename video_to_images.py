@@ -1,3 +1,7 @@
+# ---------------------------------------------------------------- #
+# Reads a video and saves the frames as images in hardcoded folder #
+# ---------------------------------------------------------------- #
+
 import cv2
 
 # Create a video capture object, in this case we are reading the video from a file
@@ -32,8 +36,6 @@ while vid_capture.isOpened():
 
         if key == ord("q"):
             break
-            
-        
     else:
         break
     i += 1

@@ -1,3 +1,9 @@
+# ----------------------------------------------------------------------------- #
+# Appends ball labels to the old person labels.                                 #
+# TODO: Introduce argparse to format arguments to the script.                   #
+# ----------------------------------------------------------------------------- #
+
+
 import os
 import shutil
 
