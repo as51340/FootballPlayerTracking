@@ -85,11 +85,7 @@ class Resolver:
             possible_indices: List[int] = []
             min_dist, min_ind, min_avg_dist, min_avg_ind = None, None, None, None
             for i in range(len(missing_ids_from_start)):
-                # ignore less than 0.01s
-                if missing_persons_time_passed[i] < 0.01:
-                    print(
-                        f"Ignoring calculation for player {missing_ids_from_start[i]} and new player {new_objects_id[j]} because of too short time passed: {missing_persons_time_passed[i]:.2f}s.")
-                elif missing_persons_time_passed[i] > 5:
+                if missing_persons_time_passed[i] > 5:
                     print(
                         f"Ignoring calculation for player {missing_ids_from_start[i]} and new player {new_objects_id[j]} because of too long time passed: {missing_persons_time_passed[i]:.2f}s.")
                 else:
